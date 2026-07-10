@@ -238,6 +238,7 @@ func (x *Record) GetSources() []*ListMembership {
 type QueryResponse struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	DatabaseCreatedAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=database_created_at,json=databaseCreatedAt,proto3" json:"database_created_at,omitempty"`
+	Records           []*Record              `protobuf:"bytes,2,rep,name=records,proto3" json:"records,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -279,6 +280,13 @@ func (x *QueryResponse) GetDatabaseCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *QueryResponse) GetRecords() []*Record {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
 var File_techaro_lol_reputationdb_v1_reputationdb_proto protoreflect.FileDescriptor
 
 const file_techaro_lol_reputationdb_v1_reputationdb_proto_rawDesc = "" +
@@ -306,9 +314,10 @@ const file_techaro_lol_reputationdb_v1_reputationdb_proto_rawDesc = "" +
 	"categories\x18\x06 \x03(\tR\n" +
 	"categories\x12\x1c\n" +
 	"\tproviders\x18\a \x03(\tR\tproviders\x12E\n" +
-	"\asources\x18\b \x03(\v2+.techaro.lol.reputationdb.v1.ListMembershipR\asources\"[\n" +
+	"\asources\x18\b \x03(\v2+.techaro.lol.reputationdb.v1.ListMembershipR\asources\"\x9a\x01\n" +
 	"\rQueryResponse\x12J\n" +
-	"\x13database_created_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x11databaseCreatedAt2s\n" +
+	"\x13database_created_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x11databaseCreatedAt\x12=\n" +
+	"\arecords\x18\x02 \x03(\v2#.techaro.lol.reputationdb.v1.RecordR\arecords2s\n" +
 	"\x11ReputationService\x12^\n" +
 	"\x05Query\x12).techaro.lol.reputationdb.v1.QueryRequest\x1a*.techaro.lol.reputationdb.v1.QueryResponseB\x95\x02\n" +
 	"\x1fcom.techaro.lol.reputationdb.v1B\x11ReputationdbProtoP\x01ZPgithub.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/v1;reputationdbv1\xa2\x02\x03TLR\xaa\x02\x1bTecharo.Lol.Reputationdb.V1\xca\x02\x1bTecharo\\Lol\\Reputationdb\\V1\xe2\x02'Techaro\\Lol\\Reputationdb\\V1\\GPBMetadata\xea\x02\x1eTecharo::Lol::Reputationdb::V1b\x06proto3"
@@ -336,13 +345,14 @@ var file_techaro_lol_reputationdb_v1_reputationdb_proto_goTypes = []any{
 var file_techaro_lol_reputationdb_v1_reputationdb_proto_depIdxs = []int32{
 	1, // 0: techaro.lol.reputationdb.v1.Record.sources:type_name -> techaro.lol.reputationdb.v1.ListMembership
 	4, // 1: techaro.lol.reputationdb.v1.QueryResponse.database_created_at:type_name -> google.protobuf.Timestamp
-	0, // 2: techaro.lol.reputationdb.v1.ReputationService.Query:input_type -> techaro.lol.reputationdb.v1.QueryRequest
-	3, // 3: techaro.lol.reputationdb.v1.ReputationService.Query:output_type -> techaro.lol.reputationdb.v1.QueryResponse
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	2, // 2: techaro.lol.reputationdb.v1.QueryResponse.records:type_name -> techaro.lol.reputationdb.v1.Record
+	0, // 3: techaro.lol.reputationdb.v1.ReputationService.Query:input_type -> techaro.lol.reputationdb.v1.QueryRequest
+	3, // 4: techaro.lol.reputationdb.v1.ReputationService.Query:output_type -> techaro.lol.reputationdb.v1.QueryResponse
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_techaro_lol_reputationdb_v1_reputationdb_proto_init() }
