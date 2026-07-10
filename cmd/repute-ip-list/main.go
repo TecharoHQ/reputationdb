@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	mmdbPath = flag.String("mmdb", "./var/abusive-ips.mmdb", "path to the vpnip mmdb database to assess against")
+	mmdbPath = flag.String("mmdb", "./var/reputationdb.mmdb", "path to the vpnip mmdb database to assess against")
 	listPath = flag.String("list", "", "path to the newline-delimited list of IP addresses")
 )
 
