@@ -1,0 +1,43 @@
+syntax = "proto3";
+package techaro.lol.reputationdb.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+service ReputationService {
+  rpc Query(QueryRequest) returns (QueryResponse);
+}
+
+message QueryRequest {
+  repeated string ip_addresses = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).cel = {
+      id : "ip_address.is_ip_address",
+      message : "ip_address must be an IP address",
+      expression : "this.isIp()"
+    }
+  ];
+}
+
+message ListMembership {
+  string repository = 1;
+  string list = 2;
+  string provider = 3;
+  string category = 4;
+}
+
+message Record {
+  string ip_address = 1;
+  bool is_vpn = 2;
+  bool is_datacenter = 3;
+  bool is_crawler = 4;
+  bool is_proxy = 5;
+  repeated string categories = 6;
+  repeated string providers = 7;
+  repeated ListMembership sources = 8;
+}
+
+message QueryResponse {
+  google.protobuf.Timestamp database_created_at = 1;
+
+}
