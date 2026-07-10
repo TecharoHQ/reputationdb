@@ -44,4 +44,4 @@ jobs:
         if: "${{ github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'Release-status: cut') }}"
         uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
         with:
-          workflow: "release.yaml"
+          workflow: "release.yml"
