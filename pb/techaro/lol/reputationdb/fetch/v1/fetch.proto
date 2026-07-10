@@ -1,0 +1,47 @@
+syntax = "proto3";
+package techaro.lol.reputationdb.fetch.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+service FetchService {
+  rpc Fetch(FetchRequest) returns (FetchResponse);
+  rpc Info(InfoRequest) returns (InfoResponse);
+  rpc List(ListRequest) returns (ListResponse);
+}
+
+message FetchRequest {
+  string version_id = 1;
+}
+
+message DatabaseVersion {
+  google.protobuf.Timestamp created_at = 1;
+  string repo_shasum = 2;
+  string repo_commit_message = 3;
+  string version_id = 4;
+}
+
+message FetchResponse {
+  // Metadata about the database version
+  DatabaseVersion version = 1;
+  // Download presigned GET url for the database
+  string presigned_url = 2;
+  // How long the client should wait before updating
+  google.protobuf.Duration lifetime = 3;
+}
+
+message InfoRequest {
+  string version_id = 1;
+}
+
+message InfoResponse {
+  // Metadata about the database version
+  DatabaseVersion version = 1;
+}
+
+message ListRequest {}
+
+message ListResponse {
+  repeated DatabaseVersion versions = 1;
+}
