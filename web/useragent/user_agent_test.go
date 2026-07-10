@@ -9,7 +9,7 @@ import (
 )
 
 func TestGenUserAgent(t *testing.T) {
-	ua := useragent.GenUserAgent("test", "https://christine.website")
+	ua := useragent.GenUserAgent("test", "test", "https://christine.website")
 	if ua == "" {
 		t.Fatal("no user agent generated")
 	}
@@ -18,10 +18,9 @@ func TestGenUserAgent(t *testing.T) {
 }
 
 func TestTransport(t *testing.T) {
-	ua := useragent.GenUserAgent("test", "https://example.com")
+	ua := useragent.GenUserAgent("test", "test", "https://example.com")
 
-	http.DefaultTransport = useragent.Transport("test", "https://example.com",
-		http.DefaultTransport)
+	http.DefaultTransport = useragent.Transport("test", "test", "https://example.com", http.DefaultTransport)
 
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if ua != r.Header.Get("User-Agent") {

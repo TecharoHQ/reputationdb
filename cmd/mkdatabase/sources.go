@@ -1479,8 +1479,8 @@ func collectFile(src fileSource, store *bart.Table[*vpnip.Record]) (int, error) 
 // RIPEstat (or a fresh on-disk copy from cacheDir) and folds each into the store
 // under every category in src.categories. Existing records gain additional
 // [vpnip.ListMembership] entries.
-func collectAS(ctx context.Context, src asnSource, cacheDir string, store *bart.Table[*vpnip.Record]) (int, error) {
-	prefixes, err := fetchAS(ctx, src, cacheDir)
+func collectAS(ctx context.Context, client *http.Client, src asnSource, cacheDir string, store *bart.Table[*vpnip.Record]) (int, error) {
+	prefixes, err := fetchAS(ctx, client, src, cacheDir)
 	if err != nil {
 		return 0, err
 	}
@@ -1494,7 +1494,7 @@ func collectAS(ctx context.Context, src asnSource, cacheDir string, store *bart.
 // cacheDir disables caching entirely. The cache holds the parsed prefix list (not
 // RIPEstat's raw response), keeping the cache format independent of the ripeasn
 // package.
-func fetchAS(ctx context.Context, src asnSource, cacheDir string) ([]netip.Prefix, error) {
+func fetchAS(ctx context.Context, client *http.Client, src asnSource, cacheDir string) ([]netip.Prefix, error) {
 	var cachePath string
 	if cacheDir != "" {
 		cachePath = filepath.Join(cacheDir, "sources", "stat.ripe.net", fmt.Sprintf("AS%d.json", src.asn))
@@ -1510,7 +1510,7 @@ func fetchAS(ctx context.Context, src asnSource, cacheDir string) ([]netip.Prefi
 
 	slog.Info("fetching announced prefixes", "asn", src.asn)
 
-	resp, err := ripeasn.Fetch(ctx, src.asn)
+	resp, err := ripeasn.Fetch(ctx, client, src.asn)
 	if err != nil {
 		return nil, err
 	}

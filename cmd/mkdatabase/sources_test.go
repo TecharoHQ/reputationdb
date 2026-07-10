@@ -820,7 +820,7 @@ func TestCollectASCache(t *testing.T) {
 	}
 
 	store := &bart.Table[*vpnip.Record]{}
-	n, err := collectAS(context.Background(), src, cacheDir, store)
+	n, err := collectAS(context.Background(), http.DefaultClient, src, cacheDir, store)
 	if err != nil {
 		t.Fatalf("collectAS: %v", err)
 	}

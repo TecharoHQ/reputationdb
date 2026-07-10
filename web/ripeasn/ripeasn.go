@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
-
-	"github.com/TecharoHQ/reputationdb/web/useragent"
 )
 
 type Response struct {
@@ -26,15 +24,16 @@ type Response struct {
 	StatusCode int    `json:"status_code"`
 }
 
-func Fetch(ctx context.Context, asNumber uint) (*Response, error) {
+// Fetch retrieves the prefixes announced by asNumber from RIPEstat using client.
+// The caller is responsible for tagging outgoing requests with a User-Agent,
+// typically by wrapping client's transport with [useragent.Transport].
+func Fetch(ctx context.Context, client *http.Client, asNumber uint) (*Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS%d", asNumber), nil)
 	if err != nil {
 		return nil, fmt.Errorf("can't make request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", useragent.GenUserAgent("TecharoHQ/reputationdb", "https://techaro.lol/contact"))
-
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("can't get details for AS%d: %w", asNumber, err)
 	}

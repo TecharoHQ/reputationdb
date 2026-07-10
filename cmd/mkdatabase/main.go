@@ -22,20 +22,37 @@ import (
 	"time"
 
 	vpnip "github.com/TecharoHQ/reputationdb"
+	"github.com/TecharoHQ/reputationdb/web/useragent"
 	"github.com/facebookgo/flagenv"
 	"github.com/gaissmai/bart"
+
+	_ "github.com/joho/godotenv/autoload"
 )
 
 var (
-	ref       = flag.String("ref", "HEAD", "git ref to clone from each source repository")
-	gcPercent = flag.Int("gc-percent", 20, "GOGC value; lower trades CPU for a smaller peak heap (see runtime/debug.SetGCPercent)")
+	gcPercent            = flag.Int("gc-percent", 20, "GOGC value; lower trades CPU for a smaller peak heap (see runtime/debug.SetGCPercent)")
+	ref                  = flag.String("ref", "HEAD", "git ref to clone from each source repository")
+	userAgentContactLink = flag.String("user-agent-contact-link", "", "contact link for the user agent string")
+	userAgentOrgName     = flag.String("user-agent-org-name", "", "organization name for the user agent string")
 )
 
 func main() {
 	flagenv.Parse()
 	flag.Parse()
 
-	lg := slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("program", "mkdatabase")
+	if useragent.Version == "(devel)" {
+		log.Fatal("Please build this binary and try again (don't use `go run`)")
+	}
+
+	if *userAgentContactLink == "" {
+		log.Fatal("Please set --user-agent-contact-link")
+	}
+
+	if *userAgentOrgName == "" {
+		log.Fatal("Please set --user-agent-org-name")
+	}
+
+	lg := slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("program", "mkdatabase", "version", useragent.Version)
 	slog.SetDefault(lg)
 
 	args := flag.Args()
@@ -90,7 +107,15 @@ func run(lg *slog.Logger, outPath string) error {
 		lg.Info("collected", "repo", src.name, "entries", n)
 	}
 
-	httpClient := &http.Client{Timeout: 5 * time.Minute}
+	httpClient := &http.Client{
+		Timeout: 5 * time.Minute,
+		Transport: useragent.Transport(
+			*userAgentOrgName,
+			"reputationdb/mkdatabase",
+			*userAgentContactLink,
+			http.DefaultTransport,
+		),
+	}
 	for _, src := range httpSources {
 		n, err := collectHTTP(context.Background(), httpClient, src, cacheDir, store)
 		if err != nil {
@@ -100,7 +125,7 @@ func run(lg *slog.Logger, outPath string) error {
 	}
 
 	for _, src := range asnSources {
-		n, err := collectAS(context.Background(), src, cacheDir, store)
+		n, err := collectAS(context.Background(), httpClient, src, cacheDir, store)
 		if err != nil {
 			return fmt.Errorf("collecting from AS%d: %w", src.asn, err)
 		}
