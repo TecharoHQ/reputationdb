@@ -16,6 +16,9 @@
     "generate": "npm run generate:buf && npm run generate:go && npm run format",
     "generate:buf": "buf generate",
     "generate:go": "go generate ./...",
+    "lint": "npm run lint:vet && npm run lint:staticcheck",
+    "lint:staticcheck": "go tool staticcheck ./...",
+    "lint:vet": "go vet ./...",
     "test": "go test ./...",
     "prepare": "husky"
   },
@@ -53,8 +56,7 @@
       "prettier -w"
     ],
     "**/*.go": [
-      "go vet ./...",
-      "go tool staticcheck ./..."
+      "go tool goimports -w"
     ]
   },
   "prettier": {
