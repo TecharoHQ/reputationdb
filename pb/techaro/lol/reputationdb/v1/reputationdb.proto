@@ -12,9 +12,9 @@ message QueryRequest {
   repeated string ip_addresses = 1 [
     (buf.validate.field).required = true,
     (buf.validate.field).cel = {
-      id : "ip_address.is_ip_address",
-      message : "ip_address must be an IP address",
-      expression : "this.isIp()"
+      id: "ip_address.is_ip_address"
+      message: "ip_address must be an IP address"
+      expression: "this.isIp()"
     }
   ];
 }
@@ -39,5 +39,5 @@ message Record {
 
 message QueryResponse {
   google.protobuf.Timestamp database_created_at = 1;
-
+  repeated Record records = 2;
 }
