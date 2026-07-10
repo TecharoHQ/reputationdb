@@ -1,0 +1,6 @@
+# DeepSeek crawler IP ranges, ported from JasonLovesDoggo/caddy-defender's
+# ranges/fetchers/deepseek.go. DeepSeek publishes no structured feed for these;
+# see https://discuss.deepsource.com/t/incoming-adding-new-ip-addresses-to-deepsources-ip-range/667
+35.225.112.198/32
+34.42.70.44/32
+104.154.172.152/32
