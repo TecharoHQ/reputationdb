@@ -93,6 +93,15 @@ func run(lg *slog.Logger, outPath string) error {
 	store := &bart.Table[*vpnip.Record]{}
 
 	cacheDir := cacheRoot(lg)
+	httpClient := &http.Client{
+		Timeout: 5 * time.Minute,
+		Transport: useragent.Transport(
+			*userAgentOrgName,
+			"reputationdb/mkdatabase",
+			*userAgentContactLink,
+			http.DefaultTransport,
+		),
+	}
 
 	for _, src := range sources {
 		fsys, err := repoFS(lg, src, *ref, cacheDir)
@@ -107,15 +116,6 @@ func run(lg *slog.Logger, outPath string) error {
 		lg.Info("collected", "repo", src.name, "entries", n)
 	}
 
-	httpClient := &http.Client{
-		Timeout: 5 * time.Minute,
-		Transport: useragent.Transport(
-			*userAgentOrgName,
-			"reputationdb/mkdatabase",
-			*userAgentContactLink,
-			http.DefaultTransport,
-		),
-	}
 	for _, src := range httpSources {
 		n, err := collectHTTP(context.Background(), httpClient, src, cacheDir, store)
 		if err != nil {
