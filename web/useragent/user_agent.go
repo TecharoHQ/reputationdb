@@ -2,6 +2,7 @@ package useragent
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"runtime"
@@ -38,15 +39,17 @@ func GenUserAgent(org, prefix, infoURL string) string {
 
 // Transport wraps a http transport with user agent information.
 func Transport(org, prefix, infoURL string, rt http.RoundTripper) http.RoundTripper {
-	return userAgentTransport{org: org, prefix: prefix, infoURL: infoURL, rt: rt}
+	ua := GenUserAgent(org, prefix, infoURL)
+	slog.Info("using user-agent", "User-Agent", ua)
+	return userAgentTransport{ua: ua, rt: rt}
 }
 
 type userAgentTransport struct {
-	org, prefix, infoURL string
-	rt                   http.RoundTripper
+	ua string
+	rt http.RoundTripper
 }
 
 func (uat userAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.Header.Set("User-Agent", GenUserAgent(uat.org, uat.prefix, uat.infoURL))
+	r.Header.Set("User-Agent", uat.ua)
 	return uat.rt.RoundTrip(r)
 }
