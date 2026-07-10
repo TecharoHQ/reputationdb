@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
   actions: write
+  attestations: write
+  id-token: write
+  pull-requests: write
 
 jobs:
   build:
