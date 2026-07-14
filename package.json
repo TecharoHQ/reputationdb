@@ -12,6 +12,8 @@
   },
   "license": "MIT",
   "scripts": {
+    "build": "go build -o ./var/mkdatabase ./cmd/mkdatabase && ./var/mkdatabase ./var/reputationdb.mmdb",
+    "publish:database": "go build -o ./var/publish-database ./cmd/publish-database && ./var/publish-database ./var/reputationdb.mmdb",
     "format": "buf format -w && go tool goimports -w . && npx prettier -w . 2>&1 >/dev/null && buf format -w",
     "generate": "npm run generate:buf && npm run generate:go && npm run format",
     "generate:buf": "buf generate",
