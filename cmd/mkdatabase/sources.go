@@ -580,7 +580,13 @@ var fileSources = []fileSource{
 		name:     "sourceware_honeypot",
 		path:     "data/manually-submitted/sourceware/ips.txt",
 		provider: "sourceware",
-		category: vpnip.CategoryAbuse,
+		category: vpnip.CategoryCrawler,
+	},
+	{
+		name:     "sourceware_honeypot",
+		path:     "data/manually-submitted/sourceware/202607141625.txt",
+		provider: "sourceware",
+		category: vpnip.CategoryCrawler,
 	},
 }
 
