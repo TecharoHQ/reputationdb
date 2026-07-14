@@ -75,7 +75,7 @@ func insertVersion(versions []*fetchv1.DatabaseVersion, v *fetchv1.DatabaseVersi
 
 	if len(kept) > maxVersions {
 		evicted = kept[maxVersions:]
-		kept = kept[:maxVersions]
+		kept = kept[:maxVersions:maxVersions]
 	}
 
 	return kept, evicted

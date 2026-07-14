@@ -47,12 +47,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := run(ctx, lg, args[0]); err != nil {
+	// Construct the Tigris client before doing any of the slow local work below,
+	// so a bad credential or bucket surfaces immediately rather than after
+	// spending time compressing a multi-hundred-megabyte database.
+	st, err := simplestorage.New(ctx, simplestorage.WithBucket(*tigrisBucket))
+	if err != nil {
+		log.Fatalf("creating Tigris client: %v", err)
+	}
+
+	if err := run(ctx, lg, st, args[0]); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(ctx context.Context, lg *slog.Logger, dbPath string) error {
+func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) error {
 	raw, err := os.ReadFile(dbPath)
 	if err != nil {
 		return fmt.Errorf("reading database %s: %w", dbPath, err)
@@ -75,23 +83,20 @@ func run(ctx context.Context, lg *slog.Logger, dbPath string) error {
 	}
 	lg.Info("compressed database", "bytes", len(compressed), "ratio", fmt.Sprintf("%.2f", float64(len(compressed))/float64(len(raw))))
 
-	st, err := simplestorage.New(ctx, simplestorage.WithBucket(*tigrisBucket))
-	if err != nil {
-		return fmt.Errorf("creating Tigris client: %w", err)
-	}
-
-	idx, err := loadIndex(ctx, st, lg)
-	if err != nil {
-		return err
-	}
-
 	if err := putDatabase(ctx, st, key, compressed); err != nil {
 		return err
 	}
 	lg.Info("uploaded database", "bucket", *tigrisBucket, "key", key)
 
-	// The index is written only after the object it points at exists, so a
-	// failed upload can never leave the index advertising a missing database.
+	// The index is loaded only after the database object it will point at
+	// exists, so a failed upload can never leave the index advertising a
+	// missing database: read-modify-write on the index is the smallest
+	// possible window, right before the write.
+	idx, err := loadIndex(ctx, st, lg)
+	if err != nil {
+		return err
+	}
+
 	kept, evicted := insertVersion(idx.GetVersions(), &fetchv1.DatabaseVersion{
 		CreatedAt:         timestamppb.New(time.Now().UTC()),
 		RepoShasum:        info.Shasum,

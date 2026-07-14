@@ -20,15 +20,25 @@ type objectStore interface {
 	List(ctx context.Context, opts ...simplestorage.ListOption) iter.Seq2[*simplestorage.Object, error]
 }
 
+// readSeekNopCloser adapts a *bytes.Reader into an io.ReadSeekCloser.
+//
+// The AWS SDK's retry middleware rewinds the request body to retry a failed
+// upload, which it can only do if the body is an io.Seeker. io.NopCloser hides
+// the *bytes.Reader's Seek method, leaving the ~314MB database upload with no
+// retry tolerance at all.
+type readSeekNopCloser struct{ *bytes.Reader }
+
+func (readSeekNopCloser) Close() error { return nil }
+
 // indexExists reports whether the index object is present.
 //
-// This is a List rather than a Get or Head because simplestorage wraps those
-// two calls' errors with %v (client.go:288 and :323), severing the error chain
-// so that a NoSuchKey cannot be told apart from a network failure with
-// errors.As. List yields the underlying error untouched. The distinction
-// matters: a missing index means "first publish, start empty", while a failed
-// call must abort — treating the latter as the former would silently discard
-// every recorded version.
+// This is a List rather than a Get or Head because Client.Get and Client.Head
+// wrap their errors with %v, not %w, severing the error chain so that a
+// NoSuchKey cannot be told apart from a network failure with errors.As. List
+// yields the underlying error untouched. The distinction matters: a missing
+// index means "first publish, start empty", while a failed call must abort —
+// treating the latter as the former would silently discard every recorded
+// version.
 func indexExists(ctx context.Context, store objectStore) (bool, error) {
 	for obj, err := range store.List(ctx, simplestorage.WithPrefix(indexKey)) {
 		if err != nil {
@@ -85,7 +95,7 @@ func saveIndex(ctx context.Context, store objectStore, idx *fetchv1.ListResponse
 		Key:         indexKey,
 		ContentType: "application/octet-stream",
 		Size:        int64(len(body)),
-		Body:        io.NopCloser(bytes.NewReader(body)),
+		Body:        readSeekNopCloser{bytes.NewReader(body)},
 	}, simplestorage.WithAccessType(simplestorage.AccessPrivate)); err != nil {
 		return fmt.Errorf("putting %s: %w", indexKey, err)
 	}
@@ -99,7 +109,7 @@ func putDatabase(ctx context.Context, store objectStore, key string, body []byte
 		Key:         key,
 		ContentType: "application/zstd",
 		Size:        int64(len(body)),
-		Body:        io.NopCloser(bytes.NewReader(body)),
+		Body:        readSeekNopCloser{bytes.NewReader(body)},
 	}, simplestorage.WithAccessType(simplestorage.AccessPrivate)); err != nil {
 		return fmt.Errorf("putting %s: %w", key, err)
 	}
