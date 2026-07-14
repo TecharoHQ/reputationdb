@@ -1,0 +1,79 @@
+name: Build database
+
+on:
+  push:
+    branches: ["main"]
+  schedule:
+    # 06:00 UTC daily. The upstream source lists are cached for 23 hours
+    # (cacheMaxAge in cmd/mkdatabase/sources.go), so a daily run always refetches.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize publishes. The version index (versions.pb.gz) is a read-modify-write
+# with no compare-and-swap, so two overlapping runs can drop a version entry.
+concurrency:
+  group: publish-database
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: saga-techaro
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+
+    env:
+      # mkdatabase refuses to start without these. Locally they come from .env,
+      # which is gitignored and therefore absent in CI.
+      USER_AGENT_CONTACT_LINK: https://techaro.lol/contact
+      USER_AGENT_ORG_NAME: Techaro
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          # Full history and tags are load-bearing: the module version is stamped
+          # from VCS into debug.BuildInfo, and mkdatabase exits if it reads back
+          # "(devel)". A shallow clone fails the build.
+          fetch-tags: true
+          fetch-depth: 0
+          # data/manually-submitted/**/*.txt is stored in git LFS. Without this,
+          # collectFile reads the LFS pointer text, parses zero IPs out of it and
+          # returns no error -- silently publishing a database missing every
+          # manually-submitted honeypot list.
+          lfs: true
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: latest
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: stable
+
+      # The key rolls every run because GitHub's caches are immutable: a fixed key
+      # would be written once and never refreshed, leaving entries pinned past
+      # their 23h TTL. restore-keys falls back to the newest prior cache.
+      - name: Cache source lists
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/techaro/reputationdb
+          key: mkdatabase-sources-${{ github.run_id }}
+          restore-keys: |
+            mkdatabase-sources-
+
+      - name: Install NPM deps
+        run: npm ci
+
+      - name: Build database
+        run: npm run build
+
+      - name: Publish database
+        run: npm run publish:database
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL_S3: https://t3.storage.dev
+          AWS_ENDPOINT_URL_IAM: https://iam.storage.dev
+          AWS_REGION: auto
