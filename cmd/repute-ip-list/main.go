@@ -2,6 +2,10 @@
 // list of IP addresses against it, reporting how many of the listed addresses
 // are present in the database and how they are flagged.
 //
+// When the GeoLite2 Country and ASN databases are available it also breaks the
+// list down by country and by originating ASN, reporting the flagged rate of
+// each as a markdown table.
+//
 // Lines that do not parse as an IP address (comments, blank lines, user-agent
 // strings, etc.) are silently skipped. Usage:
 //
@@ -11,8 +15,10 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/netip"
 	"os"
@@ -21,11 +27,15 @@ import (
 
 	"github.com/TecharoHQ/reputationdb"
 	"github.com/facebookgo/flagenv"
+	maxminddb "github.com/oschwald/maxminddb-golang/v2"
 )
 
 var (
-	mmdbPath = flag.String("mmdb", "./var/reputationdb.mmdb", "path to the vpnip mmdb database to assess against")
-	listPath = flag.String("list", "", "path to the newline-delimited list of IP addresses")
+	mmdbPath    = flag.String("mmdb", "./var/reputationdb.mmdb", "path to the vpnip mmdb database to assess against")
+	listPath    = flag.String("list", "", "path to the newline-delimited list of IP addresses")
+	countryPath = flag.String("geolite-country", "./var/GeoLite2-Country.mmdb", "path to the GeoLite2 Country database; empty disables the country breakdown")
+	asnPath     = flag.String("geolite-asn", "./var/GeoLite2-ASN.mmdb", "path to the GeoLite2 ASN database; empty disables the ASN breakdown")
+	top         = flag.Int("top", 25, "number of rows to show in the country and ASN breakdowns; zero or less shows every row")
 )
 
 func main() {
@@ -52,6 +62,34 @@ type stats struct {
 
 	categories map[string]int
 	providers  map[string]int
+
+	countries breakdown
+	asns      breakdown
+}
+
+// bucket counts the addresses attributed to a single country or ASN.
+type bucket struct {
+	label   string
+	addrs   int
+	flagged int
+}
+
+// breakdown accumulates address counts per country or ASN, keyed by a stable
+// identifier (ISO code, AS number) so that entries sharing a display label stay
+// distinct.
+type breakdown map[string]*bucket
+
+// add records one address under key, creating the bucket on first sight.
+func (b breakdown) add(key, label string, flagged bool) {
+	e, ok := b[key]
+	if !ok {
+		e = &bucket{label: label}
+		b[key] = e
+	}
+	e.addrs++
+	if flagged {
+		e.flagged++
+	}
 }
 
 func run(mmdbPath, listPath string) error {
@@ -60,6 +98,12 @@ func run(mmdbPath, listPath string) error {
 		return fmt.Errorf("opening mmdb %s: %w", mmdbPath, err)
 	}
 	defer db.Close()
+
+	g, err := openGeo(*countryPath, *asnPath)
+	if err != nil {
+		return err
+	}
+	defer g.Close()
 
 	f, err := os.Open(listPath)
 	if err != nil {
@@ -70,6 +114,8 @@ func run(mmdbPath, listPath string) error {
 	s := stats{
 		categories: map[string]int{},
 		providers:  map[string]int{},
+		countries:  breakdown{},
+		asns:       breakdown{},
 	}
 
 	sc := bufio.NewScanner(f)
@@ -89,6 +135,13 @@ func run(mmdbPath, listPath string) error {
 		if err != nil {
 			return fmt.Errorf("looking up %s: %w", addr, err)
 		}
+
+		// The geo breakdowns cover every address in the list, not just the
+		// flagged ones, so that each row can report a flagged rate.
+		if err := g.account(&s, addr, found); err != nil {
+			return err
+		}
+
 		if !found {
 			s.notFound++
 			continue
@@ -122,6 +175,130 @@ func run(mmdbPath, listPath string) error {
 	return nil
 }
 
+// countryRecord is the subset of a GeoLite2 Country record this command reads.
+type countryRecord struct {
+	Country struct {
+		ISOCode string            `maxminddb:"iso_code"`
+		Names   map[string]string `maxminddb:"names"`
+	} `maxminddb:"country"`
+	RegisteredCountry struct {
+		ISOCode string            `maxminddb:"iso_code"`
+		Names   map[string]string `maxminddb:"names"`
+	} `maxminddb:"registered_country"`
+}
+
+// asnRecord is the subset of a GeoLite2 ASN record this command reads.
+type asnRecord struct {
+	Number uint   `maxminddb:"autonomous_system_number"`
+	Org    string `maxminddb:"autonomous_system_organization"`
+}
+
+// geo resolves country and ASN metadata for an address. Either reader may be
+// nil, which disables the matching breakdown.
+type geo struct {
+	country *maxminddb.Reader
+	asn     *maxminddb.Reader
+}
+
+// openGeo opens the GeoLite2 databases at the given paths. An empty path
+// disables that database, as does a path that does not exist: the GeoLite2
+// files are downloaded separately and are not required to assess a list.
+func openGeo(countryPath, asnPath string) (*geo, error) {
+	var g geo
+	for _, db := range []struct {
+		name string
+		path string
+		dest **maxminddb.Reader
+	}{
+		{"GeoLite2 Country", countryPath, &g.country},
+		{"GeoLite2 ASN", asnPath, &g.asn},
+	} {
+		if db.path == "" {
+			continue
+		}
+		reader, err := maxminddb.Open(db.path)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			log.Printf("%s database %s not found, skipping that breakdown", db.name, db.path)
+			continue
+		case err != nil:
+			g.Close()
+			return nil, fmt.Errorf("opening %s database %s: %w", db.name, db.path, err)
+		}
+		*db.dest = reader
+	}
+	return &g, nil
+}
+
+// Close releases both GeoLite2 readers.
+func (g *geo) Close() {
+	for _, reader := range []*maxminddb.Reader{g.country, g.asn} {
+		if reader != nil {
+			reader.Close()
+		}
+	}
+}
+
+// account attributes addr to its country and ASN buckets in s.
+func (g *geo) account(s *stats, addr netip.Addr, flagged bool) error {
+	if g.country != nil {
+		res := g.country.Lookup(addr)
+		if err := res.Err(); err != nil {
+			return fmt.Errorf("looking up country for %s: %w", addr, err)
+		}
+
+		key, label := "", "(unknown)"
+		if res.Found() {
+			var rec countryRecord
+			if err := res.Decode(&rec); err != nil {
+				return fmt.Errorf("decoding country for %s: %w", addr, err)
+			}
+			// Addresses without a physical country (satellite, anycast) still
+			// carry the country their block is registered to.
+			c := rec.Country
+			if c.ISOCode == "" {
+				c = rec.RegisteredCountry
+			}
+			if c.ISOCode != "" {
+				key = c.ISOCode
+				label = fmt.Sprintf("%s (%s)", countryName(c.Names, c.ISOCode), c.ISOCode)
+			}
+		}
+		s.countries.add(key, label, flagged)
+	}
+
+	if g.asn != nil {
+		res := g.asn.Lookup(addr)
+		if err := res.Err(); err != nil {
+			return fmt.Errorf("looking up ASN for %s: %w", addr, err)
+		}
+
+		key, label := "", "(unknown)"
+		if res.Found() {
+			var rec asnRecord
+			if err := res.Decode(&rec); err != nil {
+				return fmt.Errorf("decoding ASN for %s: %w", addr, err)
+			}
+			if rec.Number != 0 {
+				key = fmt.Sprintf("%d", rec.Number)
+				label = strings.TrimSpace(fmt.Sprintf("AS%d %s", rec.Number, rec.Org))
+			}
+		}
+		s.asns.add(key, label, flagged)
+	}
+
+	return nil
+}
+
+// countryName returns the English name for a country, falling back to the ISO
+// code when GeoLite2 carries no localised name for it.
+func countryName(names map[string]string, isoCode string) string {
+	if name := names["en"]; name != "" {
+		return name
+	}
+	return isoCode
+}
+
 // report prints the accumulated statistics to stdout.
 func (s stats) report(mmdbPath, listPath string) {
 	fmt.Printf("Assessment of %s against %s\n", listPath, mmdbPath)
@@ -140,6 +317,50 @@ func (s stats) report(mmdbPath, listPath string) {
 
 	printCounts("Categories", s.categories, s.found)
 	printCounts("Providers", s.providers, s.found)
+
+	s.countries.printTable("Countries", "Country", *top)
+	s.asns.printTable("ASNs", "ASN", *top)
+}
+
+// printTable prints the breakdown as a markdown table sorted by descending
+// address count, showing at most top rows. A top of zero or less shows all of
+// them.
+func (b breakdown) printTable(title, keyHeader string, top int) {
+	if len(b) == 0 {
+		return
+	}
+
+	rows := make([]*bucket, 0, len(b))
+	for _, e := range b {
+		rows = append(rows, e)
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].addrs != rows[j].addrs {
+			return rows[i].addrs > rows[j].addrs
+		}
+		return rows[i].label < rows[j].label
+	})
+
+	shown := rows
+	if top > 0 && len(shown) > top {
+		shown = shown[:top]
+	}
+
+	fmt.Printf("\n### %s (%d distinct, of all addresses)\n\n", title, len(rows))
+	fmt.Printf("| %s | Addresses | Flagged | Rate |\n", keyHeader)
+	fmt.Println("| --- | ---: | ---: | ---: |")
+	for _, e := range shown {
+		fmt.Printf("| %s | %d | %d | %s |\n", escapePipes(e.label), e.addrs, e.flagged, pct(e.flagged, e.addrs))
+	}
+	if len(shown) < len(rows) {
+		fmt.Printf("\n... and %d more (raise -top to see them)\n", len(rows)-len(shown))
+	}
+}
+
+// escapePipes escapes the pipes in an ASN organisation name so that they do not
+// split the markdown table cell they sit in.
+func escapePipes(s string) string {
+	return strings.ReplaceAll(s, "|", `\|`)
 }
 
 // printCounts prints a count map sorted by descending count, then name.
