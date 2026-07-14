@@ -576,6 +576,12 @@ var fileSources = []fileSource{
 		provider: "deepseek",
 		category: vpnip.CategoryCrawler,
 	},
+	{
+		name:     "sourceware_honeypot",
+		path:     "data/manually-submitted/sourceware/ips.txt",
+		provider: "sourceware",
+		category: vpnip.CategoryAbuse,
+	},
 }
 
 // asnSource describes a single autonomous system whose announced prefixes are
