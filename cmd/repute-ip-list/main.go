@@ -309,14 +309,18 @@ func (s stats) report(mmdbPath, listPath string) {
 	fmt.Printf("  flagged (in db): %d (%s)\n", s.found, pct(s.found, s.addresses))
 	fmt.Printf("  clean (not in):  %d (%s)\n", s.notFound, pct(s.notFound, s.addresses))
 
-	fmt.Println("\nFlags (of flagged addresses):")
-	fmt.Printf("  is_vpn:        %d (%s)\n", s.isVPN, pct(s.isVPN, s.found))
-	fmt.Printf("  is_datacenter: %d (%s)\n", s.isDatacenter, pct(s.isDatacenter, s.found))
-	fmt.Printf("  is_crawler:    %d (%s)\n", s.isCrawler, pct(s.isCrawler, s.found))
-	fmt.Printf("  is_proxy:      %d (%s)\n", s.isProxy, pct(s.isProxy, s.found))
+	// The flags are a fixed schema, so they keep a stable order rather than
+	// sorting by count: it makes two runs easy to diff against each other.
+	fmt.Print("\n### Flags (of flagged addresses)\n\n")
+	printCountRows("Flag", []countRow{
+		{"is_vpn", s.isVPN},
+		{"is_datacenter", s.isDatacenter},
+		{"is_crawler", s.isCrawler},
+		{"is_proxy", s.isProxy},
+	}, s.found)
 
-	printCounts("Categories", s.categories, s.found)
-	printCounts("Providers", s.providers, s.found)
+	printCountTable("Categories", "Category", s.categories, s.found)
+	printCountTable("Providers", "Provider", s.providers, s.found)
 
 	s.countries.printTable("Countries", "Country", *top)
 	s.asns.printTable("ASNs", "ASN", *top)
@@ -357,36 +361,48 @@ func (b breakdown) printTable(title, keyHeader string, top int) {
 	}
 }
 
-// escapePipes escapes the pipes in an ASN organisation name so that they do not
-// split the markdown table cell they sit in.
+// escapePipes escapes the pipes in a label so that they do not split the
+// markdown table cell the label sits in.
 func escapePipes(s string) string {
 	return strings.ReplaceAll(s, "|", `\|`)
 }
 
-// printCounts prints a count map sorted by descending count, then name.
-func printCounts(title string, counts map[string]int, total int) {
+// countRow is one row of a markdown table counting a label's occurrences
+// against some total.
+type countRow struct {
+	label string
+	count int
+}
+
+// printCountTable prints a count map as a markdown table sorted by descending
+// count, then label.
+func printCountTable(title, keyHeader string, counts map[string]int, total int) {
 	if len(counts) == 0 {
 		return
 	}
 
-	type kv struct {
-		name  string
-		count int
+	rows := make([]countRow, 0, len(counts))
+	for label, count := range counts {
+		rows = append(rows, countRow{label, count})
 	}
-	pairs := make([]kv, 0, len(counts))
-	for name, count := range counts {
-		pairs = append(pairs, kv{name, count})
-	}
-	sort.Slice(pairs, func(i, j int) bool {
-		if pairs[i].count != pairs[j].count {
-			return pairs[i].count > pairs[j].count
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].count != rows[j].count {
+			return rows[i].count > rows[j].count
 		}
-		return pairs[i].name < pairs[j].name
+		return rows[i].label < rows[j].label
 	})
 
-	fmt.Printf("\n%s (of flagged addresses):\n", title)
-	for _, p := range pairs {
-		fmt.Printf("  %-24s %d (%s)\n", p.name, p.count, pct(p.count, total))
+	fmt.Printf("\n### %s (%d distinct, of flagged addresses)\n\n", title, len(rows))
+	printCountRows(keyHeader, rows, total)
+}
+
+// printCountRows prints rows as a markdown table of counts and their share of
+// total, in the order given.
+func printCountRows(keyHeader string, rows []countRow, total int) {
+	fmt.Printf("| %s | Addresses | Share |\n", keyHeader)
+	fmt.Println("| --- | ---: | ---: |")
+	for _, r := range rows {
+		fmt.Printf("| %s | %d | %s |\n", escapePipes(r.label), r.count, pct(r.count, total))
 	}
 }
 
