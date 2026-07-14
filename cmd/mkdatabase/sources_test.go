@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/fstest"
@@ -192,6 +193,64 @@ func TestCollectFile(t *testing.T) {
 
 	if rec := getRec(store, netip.MustParsePrefix("198.51.100.0/24")); rec == nil {
 		t.Error("expected masked CIDR record for 198.51.100.0/24")
+	}
+}
+
+// An unsmudged pointer parses as zero IP addresses, so without an explicit check
+// collectFile would report success and quietly drop the whole list.
+func TestCollectFileLFSPointer(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantErr bool
+	}{
+		{
+			name: "unsmudged pointer",
+			body: "version https://git-lfs.github.com/spec/v1\n" +
+				"oid sha256:f352e8a61ec22157d7b12181d71d6ab162ffc34ad0bdc7418e55b73d9b0a2013\n" +
+				"size 17938592\n",
+			wantErr: true,
+		},
+		{
+			name:    "real list is unaffected",
+			body:    "203.0.113.4\n198.51.100.0/24\n",
+			wantErr: false,
+		},
+		{
+			name:    "list mentioning the spec url in a comment is not a pointer",
+			body:    "# see version https://git-lfs.github.com/spec/v1 for details\n203.0.113.4\n",
+			wantErr: false,
+		},
+		{
+			name:    "empty file is not a pointer",
+			body:    "",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			listPath := filepath.Join(t.TempDir(), "ips.txt")
+			if err := os.WriteFile(listPath, []byte(tt.body), 0o644); err != nil {
+				t.Fatalf("write list: %v", err)
+			}
+
+			src := fileSource{name: "sourceware", path: listPath, provider: "sourceware", category: vpnip.CategoryCrawler}
+
+			_, err := collectFile(src, &bart.Table[*vpnip.Record]{})
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("collectFile() error = nil, want an error naming the unsmudged pointer")
+				}
+				if !strings.Contains(err.Error(), "git-lfs") {
+					t.Errorf("collectFile() error = %q, want it to mention git-lfs so the fix is obvious", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("collectFile() error = %v, want nil", err)
+			}
+		})
 	}
 }
 

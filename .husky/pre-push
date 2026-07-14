@@ -1,0 +1,17 @@
+# Restores git-lfs's pre-push hook.
+#
+# husky points core.hooksPath at .husky/_, which shadows .git/hooks entirely, so
+# the hook `git lfs install` writes there never runs. Running `git lfs install`
+# again only papers over it: .husky/_ is gitignored and regenerated on every
+# npm install, so anything written into it is temporary.
+#
+# Without this hook `git push` uploads the LFS pointers and silently leaves the
+# objects behind, producing a repository that looks complete but whose
+# data/manually-submitted/**/*.txt cannot be fetched by anyone -- including CI.
+command -v git-lfs >/dev/null 2>&1 || {
+  echo >&2 "git-lfs not found on PATH, but this repository stores data/manually-submitted/**/*.txt in LFS."
+  echo >&2 "Install it (apt install git-lfs / brew install git-lfs) before pushing."
+  exit 2
+}
+
+git lfs pre-push "$@"

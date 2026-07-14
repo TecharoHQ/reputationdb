@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1464,6 +1465,21 @@ func collectHTTP(ctx context.Context, client *http.Client, src httpSource, cache
 	}), nil
 }
 
+// lfsPointerPrefix begins every git-lfs pointer file, per the LFS spec.
+var lfsPointerPrefix = []byte("version https://git-lfs.github.com/spec/v1")
+
+// isLFSPointer reports whether data is a git-lfs pointer rather than the file it
+// stands for.
+//
+// The lists under data/manually-submitted are stored in LFS, and a clone made
+// without git-lfs installed leaves the pointers unsmudged. Nothing in a pointer
+// parses as an IP address, so without this check the affected source folds in
+// zero prefixes and reports no error at all -- silently building a database
+// missing every manually-submitted list.
+func isLFSPointer(data []byte) bool {
+	return bytes.HasPrefix(data, lfsPointerPrefix)
+}
+
 // collectFile reads the local list file for src and folds each parsed prefix into
 // the store under src's repository, provider, and category. It is the
 // filesystem analogue of [collectHTTP]: same parsing and folding, but the bytes
@@ -1472,6 +1488,10 @@ func collectFile(src fileSource, store *bart.Table[*vpnip.Record]) (int, error) 
 	data, err := os.ReadFile(src.path)
 	if err != nil {
 		return 0, fmt.Errorf("reading %s: %w", src.path, err)
+	}
+
+	if isLFSPointer(data) {
+		return 0, fmt.Errorf("%s is an unsmudged git-lfs pointer, not a list: run `git lfs pull`", src.path)
 	}
 
 	parse := src.parse

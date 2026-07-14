@@ -30,47 +30,19 @@ jobs:
       USER_AGENT_ORG_NAME: Techaro
 
     steps:
-      # Must precede checkout: actions/checkout shells out to git-lfs to smudge
-      # the pointers, and fails outright if the binary is missing. Prefer the
-      # distro package; fall back to the upstream release, which is a static Go
-      # binary and so works on a runner without apt.
-      - name: Install git-lfs
-        env:
-          GIT_LFS_VERSION: 3.7.1
-          GIT_LFS_SHA256_ARM64: 73a9c90eeb4312133a63c3eaee0c38c019ea7bfa0953d174809d25b18588dd8d
-          GIT_LFS_SHA256_AMD64: 1c0b6ee5200ca708c5cebebb18fdeb0e1c98f1af5c1a9cba205a4c0ab5a5ec08
+      # The saga-techaro image ships neither package, and both failures are obscure:
+      #
+      #   git-lfs   actions/checkout shells out to it to smudge the pointers under
+      #             data/manually-submitted/, and hard-fails if it is missing. This
+      #             step must therefore run before checkout.
+      #   libatomic1  the Node build actions/setup-node installs on arm64 links
+      #             against libatomic.so.1, so without it every node invocation
+      #             dies with a loader error and npm exits 127.
+      - name: Install system packages
         run: |
           set -euo pipefail
-
-          if command -v git-lfs >/dev/null 2>&1; then
-            echo "already installed: $(git-lfs version)"
-            git lfs install --skip-repo
-            exit 0
-          fi
-
-          if command -v apt-get >/dev/null 2>&1; then
-            sudo=""
-            [ "$(id -u)" -eq 0 ] || sudo="sudo"
-            $sudo apt-get update
-            $sudo apt-get install -y git-lfs
-          else
-            case "$(uname -m)" in
-              aarch64 | arm64) arch=arm64; want="$GIT_LFS_SHA256_ARM64" ;;
-              x86_64 | amd64) arch=amd64; want="$GIT_LFS_SHA256_AMD64" ;;
-              *) echo "no pinned git-lfs build for $(uname -m)" >&2; exit 1 ;;
-            esac
-
-            tarball="$RUNNER_TEMP/git-lfs.tar.gz"
-            curl -fsSL -o "$tarball" \
-              "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${arch}-v${GIT_LFS_VERSION}.tar.gz"
-            echo "${want}  ${tarball}" | sha256sum -c -
-
-            mkdir -p "$RUNNER_TEMP/git-lfs"
-            tar -xzf "$tarball" -C "$RUNNER_TEMP/git-lfs" --strip-components=1
-            echo "$RUNNER_TEMP/git-lfs" >> "$GITHUB_PATH"
-            export PATH="$RUNNER_TEMP/git-lfs:$PATH"
-          fi
-
+          sudo apt-get update
+          sudo apt-get install -y git-lfs libatomic1
           git lfs install --skip-repo
           git-lfs version
 
