@@ -7,7 +7,8 @@
 // each as a markdown table.
 //
 // Lines that do not parse as an IP address (comments, blank lines, user-agent
-// strings, etc.) are silently skipped. Usage:
+// strings, etc.) are silently skipped, as are addresses repeated later in the
+// list: every count reported is per unique address. Usage:
 //
 //	ipassess [flags]
 //	ipassess -mmdb ./var/abusive-ips.mmdb -list data/ham/gistfile1.txt
@@ -51,7 +52,8 @@ func main() {
 type stats struct {
 	totalLines int // every line read from the list file
 	skipped    int // lines that did not parse as an IP address
-	addresses  int // lines that parsed as an IP address
+	duplicates int // addresses seen earlier in the list
+	addresses  int // distinct addresses that parsed as an IP address
 	found      int // addresses present in the database
 	notFound   int // addresses absent from the database
 
@@ -118,6 +120,13 @@ func run(mmdbPath, listPath string) error {
 		asns:       breakdown{},
 	}
 
+	// Every count below is per distinct address: an address listed twice is one
+	// address, not two, and counting it twice would inflate both the totals and
+	// the per-country and per-ASN rows. Unmap keeps an address from being
+	// counted twice for being written once in IPv4 and once in IPv4-mapped
+	// IPv6 form.
+	seen := map[netip.Addr]struct{}{}
+
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		s.totalLines++
@@ -129,6 +138,12 @@ func run(mmdbPath, listPath string) error {
 			s.skipped++
 			continue
 		}
+
+		if _, ok := seen[addr.Unmap()]; ok {
+			s.duplicates++
+			continue
+		}
+		seen[addr.Unmap()] = struct{}{}
 		s.addresses++
 
 		res, found, err := db.Lookup(addr)
@@ -305,7 +320,8 @@ func (s stats) report(mmdbPath, listPath string) {
 	fmt.Println(strings.Repeat("=", 60))
 	fmt.Printf("lines read:        %d\n", s.totalLines)
 	fmt.Printf("skipped (non-IP):  %d\n", s.skipped)
-	fmt.Printf("IP addresses:      %d\n", s.addresses)
+	fmt.Printf("skipped (dupe):    %d\n", s.duplicates)
+	fmt.Printf("unique IPs:        %d\n", s.addresses)
 	fmt.Printf("  flagged (in db): %d (%s)\n", s.found, pct(s.found, s.addresses))
 	fmt.Printf("  clean (not in):  %d (%s)\n", s.notFound, pct(s.notFound, s.addresses))
 
@@ -327,8 +343,8 @@ func (s stats) report(mmdbPath, listPath string) {
 }
 
 // printTable prints the breakdown as a markdown table sorted by descending
-// address count, showing at most top rows. A top of zero or less shows all of
-// them.
+// unique address count, showing at most top rows. A top of zero or less shows
+// all of them.
 func (b breakdown) printTable(title, keyHeader string, top int) {
 	if len(b) == 0 {
 		return
@@ -351,7 +367,7 @@ func (b breakdown) printTable(title, keyHeader string, top int) {
 	}
 
 	fmt.Printf("\n### %s (%d distinct, of all addresses)\n\n", title, len(rows))
-	fmt.Printf("| %s | Addresses | Flagged | Rate |\n", keyHeader)
+	fmt.Printf("| %s | Unique IPs | Flagged | Rate |\n", keyHeader)
 	fmt.Println("| --- | ---: | ---: | ---: |")
 	for _, e := range shown {
 		fmt.Printf("| %s | %d | %d | %s |\n", escapePipes(e.label), e.addrs, e.flagged, pct(e.flagged, e.addrs))
@@ -399,7 +415,7 @@ func printCountTable(title, keyHeader string, counts map[string]int, total int) 
 // printCountRows prints rows as a markdown table of counts and their share of
 // total, in the order given.
 func printCountRows(keyHeader string, rows []countRow, total int) {
-	fmt.Printf("| %s | Addresses | Share |\n", keyHeader)
+	fmt.Printf("| %s | Unique IPs | Share |\n", keyHeader)
 	fmt.Println("| --- | ---: | ---: |")
 	for _, r := range rows {
 		fmt.Printf("| %s | %d | %s |\n", escapePipes(r.label), r.count, pct(r.count, total))
