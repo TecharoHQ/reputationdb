@@ -69,3 +69,31 @@ func (cs categorySet) selected() []string {
 	}
 	return out
 }
+
+// selectLists returns the entries of lists whose category is selected. An empty
+// result means the whole repository can be skipped: nothing in it is wanted, so
+// there is no reason to clone it.
+func selectLists(lists []listSpec, cats categorySet) []listSpec {
+	out := make([]listSpec, 0, len(lists))
+	for _, ls := range lists {
+		if cats.has(ls.category) {
+			out = append(out, ls)
+		}
+	}
+	return out
+}
+
+// intersect returns the entries of categories that are selected, preserving
+// their original order. It narrows an asnSource's categories: an AS tagged both
+// datacenter and abuse still gets fetched for a datacentre-only build, but only
+// its datacenter membership is folded. An empty result means the AS can be
+// skipped entirely.
+func (cs categorySet) intersect(categories []string) []string {
+	out := make([]string, 0, len(categories))
+	for _, c := range categories {
+		if cs.has(c) {
+			out = append(out, c)
+		}
+	}
+	return out
+}

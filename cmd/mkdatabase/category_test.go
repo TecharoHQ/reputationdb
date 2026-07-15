@@ -113,3 +113,94 @@ func TestCategorySetAllFalseValue(t *testing.T) {
 		t.Error("set with vpn=false reported all() = true, disagreeing with has(vpn) = false")
 	}
 }
+
+func TestSelectLists(t *testing.T) {
+	lists := []listSpec{
+		{glob: "data/input/ip/*.txt", category: vpnip.CategoryVPN},
+		{glob: "output/datacentres.txt", category: vpnip.CategoryDatacenter},
+		{glob: "output/crawlers.txt", category: vpnip.CategoryCrawler},
+	}
+
+	tests := []struct {
+		name string
+		cats []string
+		want []string // expected globs
+	}{
+		{
+			name: "unfiltered keeps every list",
+			cats: nil,
+			want: []string{"data/input/ip/*.txt", "output/datacentres.txt", "output/crawlers.txt"},
+		},
+		{
+			name: "datacenter keeps only the datacentre list",
+			cats: []string{vpnip.CategoryDatacenter},
+			want: []string{"output/datacentres.txt"},
+		},
+		{
+			name: "a repo with no selected lists yields nothing, so main skips cloning it",
+			cats: []string{vpnip.CategoryTor},
+			want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, err := parseCategories(tt.cats)
+			if err != nil {
+				t.Fatalf("parseCategories: %v", err)
+			}
+			var got []string
+			for _, ls := range selectLists(lists, cs) {
+				got = append(got, ls.glob)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("selectLists = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("list %d = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestCategorySetIntersect(t *testing.T) {
+	// Mirrors a real asnSource: AS136907 is tagged both datacenter and abuse.
+	asnCategories := []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}
+
+	tests := []struct {
+		name string
+		cats []string
+		want []string
+	}{
+		{
+			name: "unfiltered keeps both memberships",
+			cats: nil,
+			want: []string{"datacenter", "abuse"},
+		},
+		{
+			name: "datacenter keeps the AS but folds only its datacenter membership",
+			cats: []string{vpnip.CategoryDatacenter},
+			want: []string{"datacenter"},
+		},
+		{
+			name: "an AS with no selected category yields nothing, so main skips fetching it",
+			cats: []string{vpnip.CategoryTor},
+			want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, err := parseCategories(tt.cats)
+			if err != nil {
+				t.Fatalf("parseCategories: %v", err)
+			}
+			got := cs.intersect(asnCategories)
+			if !slices.Equal(got, tt.want) && !(len(got) == 0 && len(tt.want) == 0) {
+				t.Errorf("intersect = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
