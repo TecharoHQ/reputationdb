@@ -310,3 +310,17 @@ func TestDescribe(t *testing.T) {
 		t.Errorf("describe() with no revision = %q, want it to report an unknown revision", gotNoRev)
 	}
 }
+
+// TestDisplayNamesCoversAllCategories guards the map against drifting out of
+// sync with allCategories: a category with no display name would silently emit
+// "" into a database's type and description rather than failing the build.
+func TestDisplayNamesCoversAllCategories(t *testing.T) {
+	for _, c := range allCategories {
+		if displayNames[c] == "" {
+			t.Errorf("category %q has no display name; databaseType and baseDescription would emit an empty string for it", c)
+		}
+	}
+	if len(displayNames) != len(allCategories) {
+		t.Errorf("displayNames has %d entries, allCategories has %d: the two have drifted apart", len(displayNames), len(allCategories))
+	}
+}
