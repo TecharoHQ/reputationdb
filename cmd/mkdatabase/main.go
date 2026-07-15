@@ -145,7 +145,7 @@ func run(lg *slog.Logger, outPath string) error {
 
 	lg.Info("building database", "unique_prefixes", store.Size())
 
-	w, err := NewWriter()
+	w, err := NewWriter(legacyDatabaseType, legacyDescription, time.Now())
 	if err != nil {
 		return fmt.Errorf("creating writer: %w", err)
 	}

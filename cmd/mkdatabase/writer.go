@@ -5,15 +5,12 @@ import (
 	"io"
 	"net"
 	"net/netip"
+	"time"
 
 	vpnip "github.com/TecharoHQ/reputationdb"
 	"github.com/maxmind/mmdbwriter"
 	"github.com/maxmind/mmdbwriter/mmdbtype"
 )
-
-// DatabaseType is the value written into the mmdb metadata describing the
-// structure of the records in this database.
-const DatabaseType = "Techaro-Veil-VPN"
 
 // Writer is a thin, raw wrapper around an mmdbwriter [mmdbwriter.Tree]. It deals
 // in raw [mmdbtype.DataType] values via [Writer.InsertRaw] and in high-level
@@ -24,11 +21,18 @@ type Writer struct {
 
 // NewWriter creates a Writer backed by a fresh IPv6 tree (which also serves
 // IPv4 lookups via aliasing).
-func NewWriter() (*Writer, error) {
+//
+// databaseType and description are derived from the build's selected categories
+// (see categorySet.databaseType and describe) so that a filtered database
+// identifies itself as one. buildEpoch is pinned by the caller rather than left
+// to mmdbwriter's wall-clock default, which would make every build's bytes
+// differ; see buildEpoch.
+func NewWriter(databaseType, description string, buildEpoch time.Time) (*Writer, error) {
 	tree, err := mmdbwriter.New(mmdbwriter.Options{
-		DatabaseType: DatabaseType,
+		BuildEpoch:   buildEpoch.Unix(),
+		DatabaseType: databaseType,
 		Description: map[string]string{
-			"en": "VPN, datacenter, crawler, and proxy IP addresses aggregated from public lists",
+			"en": description,
 		},
 		// IPv6 tree, which transparently handles IPv4 lookups too.
 		IPVersion:  6,

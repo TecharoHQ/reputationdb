@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/netip"
 	"testing"
+	"time"
 
 	vpnip "github.com/TecharoHQ/reputationdb"
 	maxminddb "github.com/oschwald/maxminddb-golang/v2"
@@ -28,7 +29,8 @@ type decoded struct {
 }
 
 func TestWriterRoundTrip(t *testing.T) {
-	w, err := NewWriter()
+	epoch := time.Date(2026, 7, 14, 22, 42, 42, 0, time.UTC)
+	w, err := NewWriter(legacyDatabaseType, legacyDescription, epoch)
 	if err != nil {
 		t.Fatalf("NewWriter: %v", err)
 	}
@@ -58,8 +60,11 @@ func TestWriterRoundTrip(t *testing.T) {
 	}
 	defer db.Close()
 
-	if db.Metadata.DatabaseType != DatabaseType {
-		t.Errorf("DatabaseType = %q, want %q", db.Metadata.DatabaseType, DatabaseType)
+	if db.Metadata.DatabaseType != legacyDatabaseType {
+		t.Errorf("DatabaseType = %q, want %q", db.Metadata.DatabaseType, legacyDatabaseType)
+	}
+	if got := int64(db.Metadata.BuildEpoch); got != epoch.Unix() {
+		t.Errorf("BuildEpoch = %d, want %d", got, epoch.Unix())
 	}
 
 	// IPv4 lookup: should be vpn + datacenter, two sources.
