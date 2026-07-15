@@ -309,11 +309,11 @@ func TestCacheRepo(t *testing.T) {
 
 	// The cached tree globs and folds identically to the original clone.
 	want := &bart.Table[*vpnip.Record]{}
-	if _, err := collect(src, clone, want); err != nil {
+	if _, err := collect(src, src.lists, clone, want); err != nil {
 		t.Fatalf("collect (clone): %v", err)
 	}
 	got := &bart.Table[*vpnip.Record]{}
-	if _, err := collect(src, os.DirFS(repoDir), got); err != nil {
+	if _, err := collect(src, src.lists, os.DirFS(repoDir), got); err != nil {
 		t.Fatalf("collect (cache): %v", err)
 	}
 	for _, p := range []string{"1.2.3.4/32", "9.9.9.0/24"} {
@@ -841,7 +841,7 @@ func TestFoldAS(t *testing.T) {
 
 	store := &bart.Table[*vpnip.Record]{}
 	// Two prefixes folded under two categories => four (prefix, category) pairs.
-	if n := foldAS(store, src, prefixes); n != 4 {
+	if n := foldAS(store, src, src.categories, prefixes); n != 4 {
 		t.Errorf("foldAS counted %d pairs, want 4", n)
 	}
 
@@ -879,7 +879,7 @@ func TestCollectASCache(t *testing.T) {
 	}
 
 	store := &bart.Table[*vpnip.Record]{}
-	n, err := collectAS(context.Background(), http.DefaultClient, src, cacheDir, store)
+	n, err := collectAS(context.Background(), http.DefaultClient, src, src.categories, cacheDir, store)
 	if err != nil {
 		t.Fatalf("collectAS: %v", err)
 	}
@@ -925,7 +925,7 @@ func TestCollect(t *testing.T) {
 	}
 
 	store := &bart.Table[*vpnip.Record]{}
-	n, err := collect(src, fsys, store)
+	n, err := collect(src, src.lists, fsys, store)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}

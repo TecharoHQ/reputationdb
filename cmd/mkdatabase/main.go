@@ -109,7 +109,7 @@ func run(lg *slog.Logger, outPath string) error {
 			return err
 		}
 
-		n, err := collect(src, fsys, store)
+		n, err := collect(src, src.lists, fsys, store)
 		if err != nil {
 			return fmt.Errorf("collecting from %s: %w", src.url, err)
 		}
@@ -125,7 +125,7 @@ func run(lg *slog.Logger, outPath string) error {
 	}
 
 	for _, src := range asnSources {
-		n, err := collectAS(context.Background(), httpClient, src, cacheDir, store)
+		n, err := collectAS(context.Background(), httpClient, src, src.categories, cacheDir, store)
 		if err != nil {
 			return fmt.Errorf("collecting from AS%d: %w", src.asn, err)
 		}

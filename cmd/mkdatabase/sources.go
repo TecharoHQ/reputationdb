@@ -1388,11 +1388,13 @@ func cacheRepo(src repoSource, fsys fs.FS, repoDir string) error {
 	return os.WriteFile(filepath.Join(repoDir, fetchedMarker), nil, 0o644)
 }
 
-// collect clones src at ref and folds every matched list into the store, keyed
-// by prefix. Existing records gain additional [ListMembership] entries.
-func collect(src repoSource, fsys fs.FS, store *bart.Table[*vpnip.Record]) (int, error) {
+// collect reads every file matching lists from the repository's file tree and
+// folds the parsed prefixes into the store. lists is passed separately from src
+// rather than read off src.lists so callers can narrow it to the selected
+// categories; see selectLists.
+func collect(src repoSource, lists []listSpec, fsys fs.FS, store *bart.Table[*vpnip.Record]) (int, error) {
 	count := 0
-	for _, ls := range src.lists {
+	for _, ls := range lists {
 		files, err := matchFiles(fsys, ls.glob)
 		if err != nil {
 			return count, err
@@ -1509,14 +1511,14 @@ func collectFile(src fileSource, store *bart.Table[*vpnip.Record]) (int, error) 
 
 // collectAS fetches the prefixes announced by src's autonomous system from
 // RIPEstat (or a fresh on-disk copy from cacheDir) and folds each into the store
-// under every category in src.categories. Existing records gain additional
+// under every category in categories. Existing records gain additional
 // [vpnip.ListMembership] entries.
-func collectAS(ctx context.Context, client *http.Client, src asnSource, cacheDir string, store *bart.Table[*vpnip.Record]) (int, error) {
+func collectAS(ctx context.Context, client *http.Client, src asnSource, categories []string, cacheDir string, store *bart.Table[*vpnip.Record]) (int, error) {
 	prefixes, err := fetchAS(ctx, client, src, cacheDir)
 	if err != nil {
 		return 0, err
 	}
-	return foldAS(store, src, prefixes), nil
+	return foldAS(store, src, categories, prefixes), nil
 }
 
 // fetchAS returns the prefixes announced by src's AS. When cacheDir is non-empty
@@ -1581,13 +1583,15 @@ func asnPrefixes(resp *ripeasn.Response) []netip.Prefix {
 	return out
 }
 
-// foldAS folds prefixes into the store once per category in src.categories,
-// recording the AS as the list (e.g. "AS136907") under RIPEstat as the
-// repository. It returns the total number of (prefix, category) pairs processed.
-func foldAS(store *bart.Table[*vpnip.Record], src asnSource, prefixes []netip.Prefix) int {
+// foldAS folds every prefix the AS announces into the store, once per category.
+// categories is passed separately from src rather than read off src.categories
+// so callers can narrow it to the selected ones: an AS tagged both datacenter
+// and abuse contributes only its datacenter membership to a datacentre-only
+// build. See categorySet.intersect.
+func foldAS(store *bart.Table[*vpnip.Record], src asnSource, categories []string, prefixes []netip.Prefix) int {
 	list := fmt.Sprintf("AS%d", src.asn)
 	count := 0
-	for _, category := range src.categories {
+	for _, category := range categories {
 		count += fold(store, prefixes, vpnip.ListMembership{
 			Repository: "stat.ripe.net",
 			List:       list,
