@@ -88,3 +88,28 @@ func TestCategorySetAll(t *testing.T) {
 		t.Error("datacenter-only set reported has(vpn) = true")
 	}
 }
+
+// TestCategorySetAllFalseValue pins all() to the same notion of "selected" that
+// has() and selected() use. A set can hold an explicit false — nothing in the
+// map[string]bool type prevents it — so counting entries rather than selections
+// would call this six-entry set complete while has(vpn) reports otherwise. all()
+// decides which database an artifact is labelled as, so it must not disagree.
+func TestCategorySetAllFalseValue(t *testing.T) {
+	cs := categorySet{
+		vpnip.CategoryAbuse:      true,
+		vpnip.CategoryCrawler:    true,
+		vpnip.CategoryDatacenter: true,
+		vpnip.CategoryProxy:      true,
+		vpnip.CategoryTor:        true,
+		vpnip.CategoryVPN:        false,
+	}
+	if len(cs) != len(allCategories) {
+		t.Fatalf("test setup: len(cs) = %d, want %d entries so all() cannot pass on count alone", len(cs), len(allCategories))
+	}
+	if cs.has(vpnip.CategoryVPN) {
+		t.Error("set with vpn=false reported has(vpn) = true")
+	}
+	if cs.all() {
+		t.Error("set with vpn=false reported all() = true, disagreeing with has(vpn) = false")
+	}
+}

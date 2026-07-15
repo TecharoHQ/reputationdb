@@ -53,8 +53,11 @@ func parseCategories(flags []string) (categorySet, error) {
 // has reports whether category is selected.
 func (cs categorySet) has(category string) bool { return cs[category] }
 
-// all reports whether every known category is selected.
-func (cs categorySet) all() bool { return len(cs) == len(allCategories) }
+// all reports whether every known category is selected. It counts selections
+// rather than map entries so that it agrees with has and selected no matter how
+// the set was built: an entry explicitly set to false is unselected, and the
+// map[string]bool type cannot rule one out.
+func (cs categorySet) all() bool { return len(cs.selected()) == len(allCategories) }
 
 // selected returns the selected categories in allCategories order.
 func (cs categorySet) selected() []string {
