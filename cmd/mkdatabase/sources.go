@@ -1355,6 +1355,15 @@ func cachedRepoFresh(repoDir string) bool {
 // clone. The directory is rebuilt from scratch each time so files removed
 // upstream (or left over from a different ref) do not linger, and a
 // [fetchedMarker] is written last to stamp the fetch time.
+//
+// It deliberately caches every list in src.lists, never the categories the
+// current build selected: the cache outlives any one build and is shared by all
+// of them, so whichever build populates it first must leave it complete for the
+// rest. Narrowing this to the selected lists — the way [collect] is narrowed —
+// would let a datacenter-only build on a cold cache write a datacenter-only
+// tree; a later full build would find that tree fresh, skip the clone, and
+// silently ship a database missing every VPN, abuse, crawler, proxy, and tor
+// list this repository carries. Filter at fold time, not at cache time.
 func cacheRepo(src repoSource, fsys fs.FS, repoDir string) error {
 	if err := os.RemoveAll(repoDir); err != nil {
 		return err
