@@ -180,8 +180,9 @@ func TestDatacenterBuildDoesNotLeak(t *testing.T) {
 		t.Errorf("1.2.3.4 categories = %v, want [datacenter]", got.Categories)
 	}
 
-	// A datacentre-only address must still be present: this is a positive
-	// control proving the filtered build isn't just vacuously empty.
+	// A datacentre-only address reached via a CIDR range rather than a host
+	// route: 9.9.9.0/24 exercises a different path through the store than
+	// 1.2.3.4/32 above, and must survive the filter intact.
 	var gotDC decoded
 	if err := db.Lookup(netip.MustParseAddr("9.9.9.9")).Decode(&gotDC); err != nil {
 		t.Fatalf("Lookup 9.9.9.9: %v", err)
@@ -193,5 +194,87 @@ func TestDatacenterBuildDoesNotLeak(t *testing.T) {
 	// A VPN-only address must not be in the free database at all.
 	if res := db.Lookup(netip.MustParseAddr("5.6.7.8")); res.Found() {
 		t.Error("5.6.7.8 is in the datacentre database, but it is only on a VPN list")
+	}
+}
+
+// TestASNBuildDoesNotLeak is the AS-path analogue of
+// TestDatacenterBuildDoesNotLeak. An asnSource is the only source kind that
+// folds a partial subset of a single source's categories: a dual-tagged AS is
+// still fetched for a datacentre-only build, but only its datacenter membership
+// may be folded. Every other source kind is all-or-nothing and so cannot leak
+// partially.
+//
+// What this test guards: the intersect -> foldAS -> writer composition honours
+// the narrowed category slice it is handed. It catches a regression where
+// foldAS ignored its categories parameter and read src.categories internally,
+// which would fold the abuse membership into a datacentre-only build. Neither
+// TestCategorySetIntersect (which exercises intersect alone) nor TestFoldAS and
+// TestCollectASCache (which both pass the unfiltered src.categories straight in)
+// would notice that.
+//
+// What this test does NOT guard: that main.go actually passes the narrowed
+// slice rather than src.categories. That wiring lives in run(), which fetches
+// every real source over the network and is not unit-testable.
+func TestASNBuildDoesNotLeak(t *testing.T) {
+	// Mirrors a real dual-tagged AS: AS136907 (huawei-cloud) is tagged both
+	// datacenter and abuse.
+	src := asnSource{
+		asn:        64500,
+		provider:   "example",
+		categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse},
+	}
+
+	cats, err := parseCategories([]string{vpnip.CategoryDatacenter})
+	if err != nil {
+		t.Fatalf("parseCategories: %v", err)
+	}
+
+	prefix := netip.MustParsePrefix("9.9.9.0/24")
+	store := &bart.Table[*vpnip.Record]{}
+	foldAS(store, src, cats.intersect(src.categories), []netip.Prefix{prefix})
+
+	epoch := time.Date(2026, 7, 14, 22, 42, 42, 0, time.UTC)
+	w, err := NewWriter(cats.databaseType(), describe(cats, "v0.0.1", "2e65f968", epoch), epoch)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
+
+	for prefix, rec := range store.All() {
+		if err := w.Insert(prefix, *rec); err != nil {
+			t.Fatalf("Insert %s: %v", prefix, err)
+		}
+	}
+
+	var buf bytes.Buffer
+	if _, err := w.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	db, err := maxminddb.OpenBytes(buf.Bytes())
+	if err != nil {
+		t.Fatalf("OpenBytes: %v", err)
+	}
+	defer db.Close()
+
+	var got decoded
+	if err := db.Lookup(netip.MustParseAddr("9.9.9.9")).Decode(&got); err != nil {
+		t.Fatalf("Lookup 9.9.9.9: %v", err)
+	}
+	if !got.IsDatacenter {
+		t.Error("9.9.9.9 is_datacenter = false, want true")
+	}
+	if got.IsAbuse {
+		t.Error("9.9.9.9 is_abuse = true: the AS's abuse membership leaked into the free database")
+	}
+	if len(got.Sources) != 1 {
+		t.Errorf("9.9.9.9 sources = %d, want 1: %+v", len(got.Sources), got.Sources)
+	}
+	for _, s := range got.Sources {
+		if s.Category != vpnip.CategoryDatacenter {
+			t.Errorf("9.9.9.9 carries a %q source: %+v", s.Category, s)
+		}
+	}
+	if len(got.Categories) != 1 || got.Categories[0] != vpnip.CategoryDatacenter {
+		t.Errorf("9.9.9.9 categories = %v, want [datacenter]", got.Categories)
 	}
 }
