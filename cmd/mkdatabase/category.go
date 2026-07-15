@@ -73,10 +73,10 @@ func (cs categorySet) selected() []string {
 // selectLists returns the entries of lists whose category is selected. An empty
 // result means the whole repository can be skipped: nothing in it is wanted, so
 // there is no reason to clone it.
-func selectLists(lists []listSpec, cats categorySet) []listSpec {
+func (cs categorySet) selectLists(lists []listSpec) []listSpec {
 	out := make([]listSpec, 0, len(lists))
 	for _, ls := range lists {
-		if cats.has(ls.category) {
+		if cs.has(ls.category) {
 			out = append(out, ls)
 		}
 	}

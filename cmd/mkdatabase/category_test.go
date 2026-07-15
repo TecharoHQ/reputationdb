@@ -150,7 +150,7 @@ func TestSelectLists(t *testing.T) {
 				t.Fatalf("parseCategories: %v", err)
 			}
 			var got []string
-			for _, ls := range selectLists(lists, cs) {
+			for _, ls := range cs.selectLists(lists) {
 				got = append(got, ls.glob)
 			}
 			if len(got) != len(tt.want) {
@@ -198,7 +198,7 @@ func TestCategorySetIntersect(t *testing.T) {
 				t.Fatalf("parseCategories: %v", err)
 			}
 			got := cs.intersect(asnCategories)
-			if !slices.Equal(got, tt.want) && !(len(got) == 0 && len(tt.want) == 0) {
+			if !slices.Equal(got, tt.want) {
 				t.Errorf("intersect = %v, want %v", got, tt.want)
 			}
 		})
