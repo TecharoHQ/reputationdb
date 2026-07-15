@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	vpnip "github.com/TecharoHQ/reputationdb"
 )
@@ -96,4 +97,72 @@ func (cs categorySet) intersect(categories []string) []string {
 		}
 	}
 	return out
+}
+
+// legacyDatabaseType is the database_type an unfiltered build has always
+// written. It is preserved verbatim so existing consumers, which branch on this
+// field, see no change.
+//
+// A hypothetical --category=vpn build would derive this same string. That
+// collision is accepted: only the full and datacentre-only configurations ship.
+const legacyDatabaseType = "Techaro-Veil-VPN"
+
+// legacyDescription is the base description an unfiltered build has always
+// written. It predates the abuse and tor categories and does not mention them;
+// preserved as-is rather than churn the paid artifact's metadata.
+const legacyDescription = "VPN, datacenter, crawler, and proxy IP addresses aggregated from public lists"
+
+// displayNames renders category constants for database types and descriptions.
+var displayNames = map[string]string{
+	vpnip.CategoryAbuse:      "Abuse",
+	vpnip.CategoryCrawler:    "Crawler",
+	vpnip.CategoryDatacenter: "Datacenter",
+	vpnip.CategoryProxy:      "Proxy",
+	vpnip.CategoryTor:        "Tor",
+	vpnip.CategoryVPN:        "VPN",
+}
+
+// displaySelected returns the display names of the selected categories, in
+// allCategories order.
+func (cs categorySet) displaySelected() []string {
+	selected := cs.selected()
+	out := make([]string, 0, len(selected))
+	for _, c := range selected {
+		out = append(out, displayNames[c])
+	}
+	return out
+}
+
+// databaseType derives the mmdb database_type for the selected categories, so
+// that a consumer holding a file can tell which database it has.
+func (cs categorySet) databaseType() string {
+	if cs.all() {
+		return legacyDatabaseType
+	}
+	return "Techaro-Veil-" + strings.Join(cs.displaySelected(), "-")
+}
+
+// baseDescription derives the human sentence describing what the database
+// holds, before build provenance is appended by describe.
+func (cs categorySet) baseDescription() string {
+	if cs.all() {
+		return legacyDescription
+	}
+	return strings.Join(cs.displaySelected(), ", ") + " IP addresses aggregated from public lists"
+}
+
+// describe returns the full text written into the database's Description
+// metadata: what the database holds, plus which build produced it. Nothing else
+// in the artifact records its provenance, which is what you want when someone
+// reports a bad entry against a file they downloaded weeks ago.
+//
+// epoch is formatted rather than taken from the clock so that this string, like
+// the build epoch itself, is a pure function of the source revision. See
+// buildEpoch.
+func describe(cs categorySet, version, revision string, epoch time.Time) string {
+	if revision == "" {
+		revision = "unknown"
+	}
+	return fmt.Sprintf("%s (built by mkdatabase %s from %s at %s)",
+		cs.baseDescription(), version, revision, epoch.UTC().Format(time.RFC3339))
 }

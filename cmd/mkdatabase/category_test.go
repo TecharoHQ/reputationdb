@@ -2,7 +2,9 @@ package main
 
 import (
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	vpnip "github.com/TecharoHQ/reputationdb"
 )
@@ -202,5 +204,109 @@ func TestCategorySetIntersect(t *testing.T) {
 				t.Errorf("intersect = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDatabaseType(t *testing.T) {
+	tests := []struct {
+		name string
+		cats []string
+		want string
+	}{
+		{
+			name: "unfiltered keeps the legacy type so existing consumers see no change",
+			cats: nil,
+			want: "Techaro-Veil-VPN",
+		},
+		{
+			name: "datacenter only",
+			cats: []string{vpnip.CategoryDatacenter},
+			want: "Techaro-Veil-Datacenter",
+		},
+		{
+			name: "subset joins display names in allCategories order",
+			cats: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse},
+			want: "Techaro-Veil-Abuse-Datacenter",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, err := parseCategories(tt.cats)
+			if err != nil {
+				t.Fatalf("parseCategories: %v", err)
+			}
+			if got := cs.databaseType(); got != tt.want {
+				t.Errorf("databaseType() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBaseDescription(t *testing.T) {
+	tests := []struct {
+		name string
+		cats []string
+		want string
+	}{
+		{
+			name: "unfiltered keeps the legacy sentence verbatim",
+			cats: nil,
+			want: "VPN, datacenter, crawler, and proxy IP addresses aggregated from public lists",
+		},
+		{
+			name: "datacenter only",
+			cats: []string{vpnip.CategoryDatacenter},
+			want: "Datacenter IP addresses aggregated from public lists",
+		},
+		{
+			name: "subset joins display names in allCategories order",
+			cats: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse},
+			want: "Abuse, Datacenter IP addresses aggregated from public lists",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, err := parseCategories(tt.cats)
+			if err != nil {
+				t.Fatalf("parseCategories: %v", err)
+			}
+			if got := cs.baseDescription(); got != tt.want {
+				t.Errorf("baseDescription() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDescribe(t *testing.T) {
+	epoch := time.Date(2026, 7, 14, 22, 42, 42, 0, time.UTC)
+
+	cs, err := parseCategories([]string{vpnip.CategoryDatacenter})
+	if err != nil {
+		t.Fatalf("parseCategories: %v", err)
+	}
+
+	got := describe(cs, "v0.0.1", "2e65f968", epoch)
+	want := "Datacenter IP addresses aggregated from public lists (built by mkdatabase v0.0.1 from 2e65f968 at 2026-07-14T22:42:42Z)"
+	if got != want {
+		t.Errorf("describe() = %q, want %q", got, want)
+	}
+
+	// The full build keeps its legacy sentence as a prefix; only provenance is
+	// appended. This is the regression guard on the paid artifact.
+	full, err := parseCategories(nil)
+	if err != nil {
+		t.Fatalf("parseCategories(nil): %v", err)
+	}
+	gotFull := describe(full, "v0.0.1", "2e65f968", epoch)
+	if !strings.HasPrefix(gotFull, "VPN, datacenter, crawler, and proxy IP addresses aggregated from public lists (") {
+		t.Errorf("describe(full) = %q, want the legacy sentence as its prefix", gotFull)
+	}
+
+	// A binary built outside a git checkout has no revision to report.
+	gotNoRev := describe(cs, "v0.0.1", "", epoch)
+	if !strings.Contains(gotNoRev, "from unknown at") {
+		t.Errorf("describe() with no revision = %q, want it to report an unknown revision", gotNoRev)
 	}
 }
