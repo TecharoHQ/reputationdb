@@ -34,7 +34,12 @@ var (
 	ref                  = flag.String("ref", "HEAD", "git ref to clone from each source repository")
 	userAgentContactLink = flag.String("user-agent-contact-link", "", "contact link for the user agent string")
 	userAgentOrgName     = flag.String("user-agent-org-name", "", "organization name for the user agent string")
+	categoryFlags        categoryFlag
 )
+
+func init() {
+	flag.Var(&categoryFlags, "category", "category of source to include; repeat to select several; omit to select all (one of: abuse, crawler, datacenter, proxy, tor, vpn)")
+}
 
 func main() {
 	flagenv.Parse()
@@ -63,7 +68,12 @@ func main() {
 	}
 	outPath := args[0]
 
-	if err := run(lg, outPath); err != nil {
+	cats, err := parseCategories(categoryFlags)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := run(lg, cats, outPath); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -80,7 +90,7 @@ func cacheRoot(lg *slog.Logger) string {
 	return filepath.Join(dir, "techaro", "reputationdb")
 }
 
-func run(lg *slog.Logger, outPath string) error {
+func run(lg *slog.Logger, cats categorySet, outPath string) error {
 	// The aggregated set of prefixes dwarfs everything else this program holds.
 	// A lower GOGC keeps the peak heap closer to the live set (at the cost of
 	// more frequent GC) instead of letting it balloon to ~2x before collecting.
@@ -104,12 +114,21 @@ func run(lg *slog.Logger, outPath string) error {
 	}
 
 	for _, src := range sources {
+		// Skipping the whole repo when nothing in it is selected is what keeps a
+		// filtered build cheap: no clone, no parse.
+		lists := cats.selectLists(src.lists)
+		if len(lists) == 0 {
+			continue
+		}
+
+		// repoFS gets the whole src on purpose: it caches every list the repo
+		// carries, not just the selected ones. See cacheRepo's doc comment.
 		fsys, err := repoFS(lg, src, *ref, cacheDir)
 		if err != nil {
 			return err
 		}
 
-		n, err := collect(src, src.lists, fsys, store)
+		n, err := collect(src, lists, fsys, store)
 		if err != nil {
 			return fmt.Errorf("collecting from %s: %w", src.url, err)
 		}
@@ -117,6 +136,10 @@ func run(lg *slog.Logger, outPath string) error {
 	}
 
 	for _, src := range httpSources {
+		if !cats.has(src.category) {
+			continue
+		}
+
 		n, err := collectHTTP(context.Background(), httpClient, src, cacheDir, store)
 		if err != nil {
 			return fmt.Errorf("collecting from %s: %w", src.url, err)
@@ -125,7 +148,14 @@ func run(lg *slog.Logger, outPath string) error {
 	}
 
 	for _, src := range asnSources {
-		n, err := collectAS(context.Background(), httpClient, src, src.categories, cacheDir, store)
+		// An AS tagged both datacenter and abuse is still fetched for a
+		// datacentre-only build, but folds only its datacenter membership.
+		categories := cats.intersect(src.categories)
+		if len(categories) == 0 {
+			continue
+		}
+
+		n, err := collectAS(context.Background(), httpClient, src, categories, cacheDir, store)
 		if err != nil {
 			return fmt.Errorf("collecting from AS%d: %w", src.asn, err)
 		}
@@ -133,6 +163,10 @@ func run(lg *slog.Logger, outPath string) error {
 	}
 
 	for _, src := range fileSources {
+		if !cats.has(src.category) {
+			continue
+		}
+
 		n, err := collectFile(src, store)
 		if err != nil {
 			return fmt.Errorf("collecting from %s: %w", src.path, err)
@@ -143,9 +177,18 @@ func run(lg *slog.Logger, outPath string) error {
 	mergeContained(store)
 	debug.FreeOSMemory()
 
-	lg.Info("building database", "unique_prefixes", store.Size())
+	settings := vcsSettings()
+	epoch := buildEpoch(settings, time.Now())
+	databaseType := cats.databaseType()
 
-	w, err := NewWriter(legacyDatabaseType, legacyDescription, time.Now())
+	lg.Info("building database",
+		"unique_prefixes", store.Size(),
+		"database_type", databaseType,
+		"categories", cats.selected(),
+		"build_epoch", epoch,
+	)
+
+	w, err := NewWriter(databaseType, describe(cats, useragent.Version, shortRevision(settings), epoch), epoch)
 	if err != nil {
 		return fmt.Errorf("creating writer: %w", err)
 	}

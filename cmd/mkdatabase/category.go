@@ -166,3 +166,16 @@ func describe(cs categorySet, version, revision string, epoch time.Time) string 
 	return fmt.Sprintf("%s (built by mkdatabase %s from %s at %s)",
 		cs.baseDescription(), version, revision, epoch.UTC().Format(time.RFC3339))
 }
+
+// categoryFlag collects repeated --category values. flag.Value's Set is called
+// once per occurrence.
+type categoryFlag []string
+
+// String renders the collected values for flag's usage output.
+func (c *categoryFlag) String() string { return strings.Join(*c, ",") }
+
+// Set appends one occurrence's value.
+func (c *categoryFlag) Set(value string) error {
+	*c = append(*c, value)
+	return nil
+}

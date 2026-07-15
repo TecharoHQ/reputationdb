@@ -62,8 +62,6 @@ func shortRevision(settings []debug.BuildSetting) string {
 // would just restate whatever the test binary happens to be stamped with. That
 // is why buildEpoch and shortRevision take settings as a parameter — the logic
 // worth testing is pure, and this thin debug.ReadBuildInfo wrapper is not.
-//
-//lint:ignore U1000 wired up by main.go in a later task
 func vcsSettings() []debug.BuildSetting {
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
