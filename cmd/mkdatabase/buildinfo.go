@@ -56,11 +56,10 @@ func shortRevision(settings []debug.BuildSetting) string {
 }
 
 // vcsSettings returns the running binary's build settings, or nil when the
-// build info is unavailable.
+// build info is unavailable. It is wired up from main.go in a later task; see
+// buildinfo_test.go for why it has no direct test of its own.
 //
-// for why it has no direct test of its own.
-//
-//lint:ignore U1000 wired up by main.go in a later task; see buildinfo_test.go
+//lint:ignore U1000 wired up by main.go in a later task
 func vcsSettings() []debug.BuildSetting {
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
