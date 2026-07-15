@@ -28,7 +28,7 @@ If you want free access to the database builds, please submit honeypot logs to t
 
 ## Free datacentre-only database
 
-A datacentre-only build of the database is published for free as a rolling asset on the `v0.0.0` release. This isn't live yet: the asset shows up once the CI job that builds and uploads it is wired up, so the URL below will 404 until then.
+A datacentre-only build of the database is published for free as a rolling asset on the `v0.0.0` release:
 
 ```text
 curl -LO https://github.com/TecharoHQ/reputationdb/releases/download/v0.0.0/datacenter.mmdb.zstd
