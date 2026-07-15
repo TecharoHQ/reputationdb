@@ -26,6 +26,23 @@ Anubis will automatically do this once $MILESTONE is reached.
 
 If you want free access to the database builds, please submit honeypot logs to this repo as a PR. See `cmd/mkdatabase/sources.go`'s `var fileSources` and put your IP addresses in `data/manually-submitted/<orgname>/<datetime.txt>`. Please note that for performance reasons the data in that folder is stored in git LFS.
 
+## Free datacentre-only database
+
+A datacentre-only build of the database is published for free as a rolling asset on the `v0.0.0` release:
+
+```text
+curl -LO https://github.com/TecharoHQ/reputationdb/releases/download/v0.0.0/datacenter.mmdb.zstd
+zstd -d datacenter.mmdb.zstd
+```
+
+That asset gets overwritten on every build; it isn't versioned. The release page's upload timestamp is the only freshness signal that means anything here. Don't use `build_epoch` in the file's own metadata for that — it records the commit the `mkdatabase` binary was built from, not when the data was collected, and reading it as a freshness indicator will mislead you.
+
+It has mmdb `database_type` `Techaro-Veil-Datacenter` and the same record schema as the full database, so whatever reader you write for one decodes the other without changes.
+
+It only contains datacentre data. An address that's also a known VPN exit or abuse source shows up here as a datacentre address and nothing more — the combined reputation signal across categories is what the paid database sells.
+
+Build it yourself with `npm run build:datacenter`, which runs `mkdatabase --category=datacenter`. `--category` also takes `abuse`, `crawler`, `proxy`, `tor`, and `vpn`, can be repeated to select more than one, and if you omit it you get everything, which is how the full database is built.
+
 ## Publishing databases
 
 `cmd/publish-database` uploads a built database to Tigris:
