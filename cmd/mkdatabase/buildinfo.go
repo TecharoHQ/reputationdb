@@ -56,8 +56,12 @@ func shortRevision(settings []debug.BuildSetting) string {
 }
 
 // vcsSettings returns the running binary's build settings, or nil when the
-// build info is unavailable. It is wired up from main.go in a later task; see
-// buildinfo_test.go for why it has no direct test of its own.
+// build info is unavailable.
+//
+// It has no test of its own: it reads real process state, so any assertion
+// would just restate whatever the test binary happens to be stamped with. That
+// is why buildEpoch and shortRevision take settings as a parameter — the logic
+// worth testing is pure, and this thin debug.ReadBuildInfo wrapper is not.
 //
 //lint:ignore U1000 wired up by main.go in a later task
 func vcsSettings() []debug.BuildSetting {
