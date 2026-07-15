@@ -23,6 +23,11 @@ jobs:
     runs-on: saga-techaro
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
 
+    # Needed by the release upload at the end of this job; the paid database
+    # goes to Tigris and needs no GitHub write access.
+    permissions:
+      contents: write
+
     env:
       # mkdatabase refuses to start without these. Locally they come from .env,
       # which is gitignored and therefore absent in CI.
@@ -38,11 +43,13 @@ jobs:
       #   libatomic1  the Node build actions/setup-node installs on arm64 links
       #             against libatomic.so.1, so without it every node invocation
       #             dies with a loader error and npm exits 127.
+      #   zstd      compresses the free datacentre database for its GitHub
+      #             release asset.
       - name: Install system packages
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y git-lfs libatomic1
+          sudo apt-get install -y git-lfs libatomic1 zstd
           git lfs install --skip-repo
           git-lfs version
 
@@ -93,3 +100,19 @@ jobs:
           AWS_ENDPOINT_URL_S3: https://t3.storage.dev
           AWS_ENDPOINT_URL_IAM: https://iam.storage.dev
           AWS_REGION: auto
+
+      # The free datacentre-only database. Its sources are a subset of the full
+      # build's and the source cache is warm from it, so this refetches nothing
+      # and skips every source with no datacentre tag.
+      - name: Build datacenter database
+        run: npm run build:datacenter
+
+      - name: Compress datacenter database
+        run: zstd -19 -T0 -f ./var/datacenter.mmdb -o ./var/datacenter.mmdb.zstd
+
+      # v0.0.0 is a rolling release: --clobber replaces the previous asset in
+      # place, so the download URL never changes.
+      - name: Upload datacenter database to the v0.0.0 release
+        run: gh release upload v0.0.0 ./var/datacenter.mmdb.zstd --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
