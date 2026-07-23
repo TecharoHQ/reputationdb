@@ -589,6 +589,14 @@ var fileSources = []fileSource{
 		provider: "sourceware",
 		category: vpnip.CategoryCrawler,
 	},
+	{
+		// Huawei Cloud (Mexico) ranges caught abusively scraping cgit on
+		// sourceware.org.
+		name:     "sourceware_honeypot",
+		path:     "data/manually-submitted/sourceware/20260723-huawei-cloud-mx.txt",
+		provider: "sourceware",
+		category: vpnip.CategoryAbuse,
+	},
 }
 
 // asnSource describes a single autonomous system whose announced prefixes are
