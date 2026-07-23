@@ -597,6 +597,14 @@ var fileSources = []fileSource{
 		provider: "sourceware",
 		category: vpnip.CategoryAbuse,
 	},
+	{
+		// Range impersonating Googlebot while abusively scraping cgit on
+		// sourceware.org.
+		name:     "sourceware_honeypot",
+		path:     "data/manually-submitted/sourceware/20260723-rogue-googlebot.txt",
+		provider: "sourceware",
+		category: vpnip.CategoryAbuse,
+	},
 }
 
 // asnSource describes a single autonomous system whose announced prefixes are
