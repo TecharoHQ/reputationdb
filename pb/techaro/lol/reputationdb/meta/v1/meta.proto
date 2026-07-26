@@ -1,0 +1,47 @@
+syntax = "proto3";
+package techaro.lol.reputationdb.meta.v1;
+
+import "gnostic/openapi/v3/annotations.proto";
+
+option (gnostic.openapi.v3.document) = {
+  info: {
+    title: "Techaro reputationdb API";
+    version: "0.0.1";
+    description: "The API for managing, querying, and updating your reputation database checkout";
+    contact: {
+      name: "Techaro";
+      url: "https://github.com/TecharoHQ/reputationdb";
+    };
+    license: {
+      name: "MIT License";
+      url: "https://github.com/TecharoHQ/reputationdb/blob/main/LICENSE";
+    };
+  };
+  security: [
+    {
+      additional_properties: [
+        {
+          name: "APIKey";
+          value: {};
+        }
+      ];
+    }
+  ];
+  components: {
+    security_schemes: {
+      additional_properties: [
+        {
+          name: "APIKey";
+          value: {
+            security_scheme: {
+              description: "Thoth API key",
+              type: "http",
+              scheme: "bearer",
+              bearer_format: "Paseto",
+            };
+          };
+        }
+      ];
+    };
+  };
+};

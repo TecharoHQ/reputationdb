@@ -7,14 +7,29 @@ managed:
   disable:
     - file_option: go_package
       module: buf.build/bufbuild/protovalidate
+    - file_option: go_package
+      module: buf.build/googleapis/googleapis
+    - file_option: go_package
+      module: buf.build/gnostic/gnostic
 plugins:
-  - remote: buf.build/protocolbuffers/go
+  - local: [go, tool, protoc-gen-go]
     out: gen
     opt:
       - paths=source_relative
-  - remote: buf.build/connectrpc/go:v1.18.1
+  - local: [go, tool, protoc-gen-connect-go]
     out: gen
     opt:
       - paths=source_relative
+  - local: [go, tool, protoc-gen-connect-openapi]
+    out: gen
+    strategy: all
+    opt:
+      - path=openapi.yaml
+      - format=yaml
+      - features=google.api.http;protovalidate;gnostic
+      - content-types=json;proto
+      - with-proto-annotations
+      - with-proto-names
+      - allowed-visibilities=PUBLIC
 inputs:
   - directory: pb

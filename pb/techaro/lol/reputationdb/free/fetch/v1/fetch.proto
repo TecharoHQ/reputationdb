@@ -1,0 +1,55 @@
+syntax = "proto3";
+package techaro.lol.reputationdb.free.fetch.v1;
+
+import "buf/validate/validate.proto";
+import "gnostic/openapi/v3/annotations.proto";
+import "google/api/annotations.proto";
+import "google/api/visibility.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+service FetchService {
+  rpc Fetch(FetchRequest) returns (FetchResponse) {
+    option (google.api.http).get = "/api/v1/database/free/fetch";
+    option (google.api.method_visibility).restriction = "PUBLIC";
+  };
+}
+
+message FetchRequest {
+  option (gnostic.openapi.v3.schema) = {
+    title: "Free Fetch Request";
+    description: "A request for a download URL for the current free datacentre-only database. Takes no parameters: the free tier always serves the latest build rather than a caller-selected version.";
+  };
+}
+
+message FetchResponse {
+  option (gnostic.openapi.v3.schema) = {
+    title: "Free Fetch Response";
+    description: "A time-limited download URL for the current free datacentre-only database build, plus how long the client should wait before checking for a newer one.";
+  };
+
+  google.protobuf.Duration lifetime = 1 [
+    (gnostic.openapi.v3.property) = {
+      title: "Lifetime";
+      description: "How long the client should wait before checking for a newer database build";
+    }
+  ];
+  string version = 2 [
+    (gnostic.openapi.v3.property) = {
+      title: "Version";
+      description: "Identifies the free database build being served, so clients can tell whether they already have it";
+    }
+  ];
+  string presigned_url = 3 [
+    (gnostic.openapi.v3.property) = {
+      title: "Presigned URL";
+      description: "A presigned GET URL for the zstd-compressed datacentre-only database. It expires, so fetch it again rather than caching the URL itself.";
+    }
+  ];
+  google.protobuf.Timestamp created_at = 4 [
+    (gnostic.openapi.v3.property) = {
+      title: "Created At";
+      description: "When this free database build was published, so clients can tell how stale it is";
+    }
+  ];
+}

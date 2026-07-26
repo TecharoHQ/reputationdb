@@ -12,6 +12,9 @@ import (
 	unsafe "unsafe"
 
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/google/gnostic/openapiv3"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
+	_ "google.golang.org/genproto/googleapis/api/visibility"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -373,34 +376,38 @@ var File_techaro_lol_reputationdb_fetch_v1_fetch_proto protoreflect.FileDescript
 
 const file_techaro_lol_reputationdb_fetch_v1_fetch_proto_rawDesc = "" +
 	"\n" +
-	"-techaro/lol/reputationdb/fetch/v1/fetch.proto\x12!techaro.lol.reputationdb.fetch.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"-\n" +
-	"\fFetchRequest\x12\x1d\n" +
+	"-techaro/lol/reputationdb/fetch/v1/fetch.proto\x12!techaro.lol.reputationdb.fetch.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf2\x01\n" +
+	"\fFetchRequest\x12}\n" +
 	"\n" +
-	"version_id\x18\x01 \x01(\tR\tversionId\"\xbc\x01\n" +
-	"\x0fDatabaseVersion\x129\n" +
+	"version_id\x18\x01 \x01(\tB^\xbaG[J\n" +
+	"Version ID\x92\x02LThe version ID of the database to download, as returned by the list endpointR\tversionId:c\xbaGRJ\rFetch Request\x92\x02@A request for a download URL for one published database version.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xb5\x06\n" +
+	"\x0fDatabaseVersion\x12t\n" +
 	"\n" +
-	"created_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1f\n" +
-	"\vrepo_shasum\x18\x02 \x01(\tR\n" +
-	"repoShasum\x12.\n" +
-	"\x13repo_commit_message\x18\x03 \x01(\tR\x11repoCommitMessage\x12\x1d\n" +
+	"created_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB9\xbaG6J\n" +
+	"Created At\x92\x02'When this version was published, in UTCR\tcreatedAt\x12\x89\x01\n" +
+	"\vrepo_shasum\x18\x02 \x01(\tBh\xbaGeJ\x15Repository Commit SHA\x92\x02KThe full hex SHA of the data repository commit this database was built fromR\n" +
+	"repoShasum\x12\x9e\x01\n" +
+	"\x13repo_commit_message\x18\x03 \x01(\tBn\xbaGkJ\x19Repository Commit Message\x92\x02MThe commit message of the data repository commit this database was built fromR\x11repoCommitMessage\x12\xe9\x01\n" +
 	"\n" +
-	"version_id\x18\x04 \x01(\tR\tversionId\"\xb9\x01\n" +
-	"\rFetchResponse\x12L\n" +
-	"\aversion\x18\x01 \x01(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionR\aversion\x12#\n" +
-	"\rpresigned_url\x18\x02 \x01(\tR\fpresignedUrl\x125\n" +
-	"\blifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\blifetime\",\n" +
-	"\vInfoRequest\x12\x1d\n" +
+	"version_id\x18\x04 \x01(\tB\xc9\x01\xbaG\xc5\x01J\n" +
+	"Version ID\x92\x02\xb5\x01The identity of the database contents: the unpadded URL-safe base64 encoding of the SHA-512 of the uncompressed database. Republishing identical contents yields the same version ID.R\tversionId:\x92\x01\xbaG\x80\x01J\x10Database Version\x92\x02kMetadata about a single published database version, including the data repository commit it was built from.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\x90\x05\n" +
+	"\rFetchResponse\x12\x91\x01\n" +
+	"\aversion\x18\x01 \x01(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionBC\xbaG@J\aVersion\x92\x024Metadata about the database version being downloadedR\aversion\x12\xb3\x01\n" +
+	"\rpresigned_url\x18\x02 \x01(\tB\x8d\x01\xbaG\x89\x01J\rPresigned URL\x92\x02wA presigned GET URL for the zstd-compressed database. It expires, so fetch it again rather than caching the URL itself.R\fpresignedUrl\x12\x93\x01\n" +
+	"\blifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\\\xbaGYJ\bLifetime\x92\x02LHow long the client should wait before checking for a newer database versionR\blifetime:\x9e\x01\xbaG\x8c\x01J\x0eFetch Response\x92\x02yA time-limited download URL for a database version, plus how long the client should wait before checking for a newer one.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\x84\x02\n" +
+	"\vInfoRequest\x12}\n" +
 	"\n" +
-	"version_id\x18\x01 \x01(\tR\tversionId\"\\\n" +
-	"\fInfoResponse\x12L\n" +
-	"\aversion\x18\x01 \x01(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionR\aversion\"\r\n" +
-	"\vListRequest\"^\n" +
-	"\fListResponse\x12N\n" +
-	"\bversions\x18\x01 \x03(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionR\bversions2\xcc\x02\n" +
-	"\fFetchService\x12j\n" +
-	"\x05Fetch\x12/.techaro.lol.reputationdb.fetch.v1.FetchRequest\x1a0.techaro.lol.reputationdb.fetch.v1.FetchResponse\x12g\n" +
-	"\x04Info\x12..techaro.lol.reputationdb.fetch.v1.InfoRequest\x1a/.techaro.lol.reputationdb.fetch.v1.InfoResponse\x12g\n" +
-	"\x04List\x12..techaro.lol.reputationdb.fetch.v1.ListRequest\x1a/.techaro.lol.reputationdb.fetch.v1.ListResponseB\xad\x02\n" +
+	"version_id\x18\x01 \x01(\tB^\xbaG[J\n" +
+	"Version ID\x92\x02LThe version ID of the database to describe, as returned by the list endpointR\tversionId:v\xbaGeJ\fInfo Request\x92\x02TA request for metadata about one published database version, without a download URL.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xee\x01\n" +
+	"\fInfoResponse\x12\x8a\x01\n" +
+	"\aversion\x18\x01 \x01(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionB<\xbaG9J\aVersion\x92\x02-Metadata about the requested database versionR\aversion:Q\xbaG@J\rInfo Response\x92\x02.Metadata about one published database version.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\x88\x01\n" +
+	"\vListRequest:y\xbaGhJ\fList Request\x92\x02WA request for every database version the server currently retains. Takes no parameters.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xa0\x02\n" +
+	"\fListResponse\x12\xb6\x01\n" +
+	"\bversions\x18\x01 \x03(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionBf\xbaGcJ\bVersions\x92\x02VThe retained database versions, ordered newest first and capped at the ten most recentR\bversions:W\xbaGFJ\rList Response\x92\x024Every database version the server currently retains.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC2\xec\x03\n" +
+	"\fFetchService\x12\xa5\x01\n" +
+	"\x05Fetch\x12/.techaro.lol.reputationdb.fetch.v1.FetchRequest\x1a0.techaro.lol.reputationdb.fetch.v1.FetchResponse\"9\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\x82\xd3\xe4\x93\x02%\x12#/api/v1/database/{version_id}/fetch\x12\xa1\x01\n" +
+	"\x04Info\x12..techaro.lol.reputationdb.fetch.v1.InfoRequest\x1a/.techaro.lol.reputationdb.fetch.v1.InfoResponse\"8\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\x82\xd3\xe4\x93\x02$\x12\"/api/v1/database/{version_id}/info\x12\x8f\x01\n" +
+	"\x04List\x12..techaro.lol.reputationdb.fetch.v1.ListRequest\x1a/.techaro.lol.reputationdb.fetch.v1.ListResponse\"&\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/databaseB\xad\x02\n" +
 	"%com.techaro.lol.reputationdb.fetch.v1B\n" +
 	"FetchProtoP\x01ZOgithub.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1;fetchv1\xa2\x02\x04TLRF\xaa\x02!Techaro.Lol.Reputationdb.Fetch.V1\xca\x02!Techaro\\Lol\\Reputationdb\\Fetch\\V1\xe2\x02-Techaro\\Lol\\Reputationdb\\Fetch\\V1\\GPBMetadata\xea\x02%Techaro::Lol::Reputationdb::Fetch::V1b\x06proto3"
 
