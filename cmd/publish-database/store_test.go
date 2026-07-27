@@ -91,11 +91,11 @@ func TestLoadIndexMissingReturnsEmpty(t *testing.T) {
 
 func TestLoadIndexExisting(t *testing.T) {
 	store := newFakeStore()
-	encoded, err := encodeIndex(&fetchv1.ListResponse{
+	encoded, err := dbstore.EncodeIndex(&fetchv1.ListResponse{
 		Versions: []*fetchv1.DatabaseVersion{{VersionId: "abc"}},
 	})
 	if err != nil {
-		t.Fatalf("encodeIndex() error = %v", err)
+		t.Fatalf("dbstore.EncodeIndex() error = %v", err)
 	}
 	store.objects[dbstore.IndexKey] = encoded
 

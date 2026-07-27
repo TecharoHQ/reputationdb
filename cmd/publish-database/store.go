@@ -77,7 +77,7 @@ func loadIndex(ctx context.Context, store objectStore, lg *slog.Logger) (*fetchv
 		return nil, fmt.Errorf("reading %s: %w", dbstore.IndexKey, err)
 	}
 
-	idx, err := decodeIndex(gzipped)
+	idx, err := dbstore.DecodeIndex(gzipped)
 	if err != nil {
 		return nil, fmt.Errorf("decoding %s: %w", dbstore.IndexKey, err)
 	}
@@ -87,7 +87,7 @@ func loadIndex(ctx context.Context, store objectStore, lg *slog.Logger) (*fetchv
 
 // saveIndex encodes and uploads the version index, overwriting the existing one.
 func saveIndex(ctx context.Context, store objectStore, idx *fetchv1.ListResponse) error {
-	body, err := encodeIndex(idx)
+	body, err := dbstore.EncodeIndex(idx)
 	if err != nil {
 		return err
 	}

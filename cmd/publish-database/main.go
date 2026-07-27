@@ -98,7 +98,7 @@ func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) er
 		return err
 	}
 
-	kept, evicted := insertVersion(idx.GetVersions(), &fetchv1.DatabaseVersion{
+	kept, evicted := dbstore.InsertVersion(idx.GetVersions(), &fetchv1.DatabaseVersion{
 		CreatedAt:         timestamppb.New(time.Now().UTC()),
 		RepoShasum:        info.Shasum,
 		RepoCommitMessage: info.Message,

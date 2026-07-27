@@ -1,4 +1,4 @@
-package main
+package dbstore_test
 
 import (
 	"fmt"
@@ -29,23 +29,23 @@ func TestEncodeDecodeIndexRoundTrip(t *testing.T) {
 		},
 	}
 
-	encoded, err := encodeIndex(want)
+	encoded, err := dbstore.EncodeIndex(want)
 	if err != nil {
-		t.Fatalf("encodeIndex() error = %v", err)
+		t.Fatalf("dbstore.EncodeIndex() error = %v", err)
 	}
 
 	// gzip magic number: the object must actually be gzipped.
 	if len(encoded) < 2 || encoded[0] != 0x1f || encoded[1] != 0x8b {
-		t.Errorf("encodeIndex() did not produce gzip data, first bytes = %x", encoded[:min(2, len(encoded))])
+		t.Errorf("dbstore.EncodeIndex() did not produce gzip data, first bytes = %x", encoded[:min(2, len(encoded))])
 	}
 
-	got, err := decodeIndex(encoded)
+	got, err := dbstore.DecodeIndex(encoded)
 	if err != nil {
-		t.Fatalf("decodeIndex() error = %v", err)
+		t.Fatalf("dbstore.DecodeIndex() error = %v", err)
 	}
 
 	if len(got.GetVersions()) != 2 {
-		t.Fatalf("decodeIndex() returned %d versions, want 2", len(got.GetVersions()))
+		t.Fatalf("dbstore.DecodeIndex() returned %d versions, want 2", len(got.GetVersions()))
 	}
 	if got.GetVersions()[0].GetVersionId() != "one" {
 		t.Errorf("versions[0].VersionId = %q, want %q", got.GetVersions()[0].GetVersionId(), "one")
@@ -59,23 +59,23 @@ func TestEncodeDecodeIndexRoundTrip(t *testing.T) {
 }
 
 func TestDecodeIndexEmpty(t *testing.T) {
-	encoded, err := encodeIndex(&fetchv1.ListResponse{})
+	encoded, err := dbstore.EncodeIndex(&fetchv1.ListResponse{})
 	if err != nil {
-		t.Fatalf("encodeIndex() error = %v", err)
+		t.Fatalf("dbstore.EncodeIndex() error = %v", err)
 	}
 
-	got, err := decodeIndex(encoded)
+	got, err := dbstore.DecodeIndex(encoded)
 	if err != nil {
-		t.Fatalf("decodeIndex() error = %v", err)
+		t.Fatalf("dbstore.DecodeIndex() error = %v", err)
 	}
 	if len(got.GetVersions()) != 0 {
-		t.Errorf("decodeIndex() returned %d versions, want 0", len(got.GetVersions()))
+		t.Errorf("dbstore.DecodeIndex() returned %d versions, want 0", len(got.GetVersions()))
 	}
 }
 
 func TestDecodeIndexGarbage(t *testing.T) {
-	if _, err := decodeIndex([]byte("this is not gzip")); err == nil {
-		t.Error("decodeIndex() error = nil, want an error for non-gzip input")
+	if _, err := dbstore.DecodeIndex([]byte("this is not gzip")); err == nil {
+		t.Error("dbstore.DecodeIndex() error = nil, want an error for non-gzip input")
 	}
 }
 
@@ -83,10 +83,10 @@ func TestInsertVersionPrepends(t *testing.T) {
 	at := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
 	existing := []*fetchv1.DatabaseVersion{testVersion("old", at.Add(-time.Hour))}
 
-	kept, evicted := insertVersion(existing, testVersion("new", at))
+	kept, evicted := dbstore.InsertVersion(existing, testVersion("new", at))
 
 	if len(kept) != 2 {
-		t.Fatalf("insertVersion() kept %d versions, want 2", len(kept))
+		t.Fatalf("dbstore.InsertVersion() kept %d versions, want 2", len(kept))
 	}
 	if kept[0].GetVersionId() != "new" {
 		t.Errorf("kept[0].VersionId = %q, want %q (newest first)", kept[0].GetVersionId(), "new")
@@ -95,20 +95,20 @@ func TestInsertVersionPrepends(t *testing.T) {
 		t.Errorf("kept[1].VersionId = %q, want %q", kept[1].GetVersionId(), "old")
 	}
 	if len(evicted) != 0 {
-		t.Errorf("insertVersion() evicted %d versions, want 0", len(evicted))
+		t.Errorf("dbstore.InsertVersion() evicted %d versions, want 0", len(evicted))
 	}
 }
 
 func TestInsertVersionIntoEmpty(t *testing.T) {
 	at := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
 
-	kept, evicted := insertVersion(nil, testVersion("first", at))
+	kept, evicted := dbstore.InsertVersion(nil, testVersion("first", at))
 
 	if len(kept) != 1 || kept[0].GetVersionId() != "first" {
-		t.Errorf("insertVersion(nil, ...) kept = %v, want one entry with ID %q", kept, "first")
+		t.Errorf("dbstore.InsertVersion(nil, ...) kept = %v, want one entry with ID %q", kept, "first")
 	}
 	if len(evicted) != 0 {
-		t.Errorf("insertVersion() evicted %d versions, want 0", len(evicted))
+		t.Errorf("dbstore.InsertVersion() evicted %d versions, want 0", len(evicted))
 	}
 }
 
@@ -121,10 +121,10 @@ func TestInsertVersionTrimsToMax(t *testing.T) {
 		existing = append(existing, testVersion(fmt.Sprintf("v%d", i), at.Add(-time.Duration(i)*time.Hour)))
 	}
 
-	kept, evicted := insertVersion(existing, testVersion("newest", at.Add(time.Hour)))
+	kept, evicted := dbstore.InsertVersion(existing, testVersion("newest", at.Add(time.Hour)))
 
 	if len(kept) != dbstore.MaxVersions {
-		t.Fatalf("insertVersion() kept %d versions, want %d", len(kept), dbstore.MaxVersions)
+		t.Fatalf("dbstore.InsertVersion() kept %d versions, want %d", len(kept), dbstore.MaxVersions)
 	}
 	if kept[0].GetVersionId() != "newest" {
 		t.Errorf("kept[0].VersionId = %q, want %q", kept[0].GetVersionId(), "newest")
@@ -133,7 +133,7 @@ func TestInsertVersionTrimsToMax(t *testing.T) {
 		t.Errorf("kept[last].VersionId = %q, want %q", last, "v8")
 	}
 	if len(evicted) != 1 {
-		t.Fatalf("insertVersion() evicted %d versions, want 1", len(evicted))
+		t.Fatalf("dbstore.InsertVersion() evicted %d versions, want 1", len(evicted))
 	}
 	if evicted[0].GetVersionId() != "v9" {
 		t.Errorf("evicted[0].VersionId = %q, want %q (the oldest)", evicted[0].GetVersionId(), "v9")
@@ -149,10 +149,10 @@ func TestInsertVersionDeduplicates(t *testing.T) {
 	}
 
 	// Republishing an identical database produces the same version ID.
-	kept, evicted := insertVersion(existing, testVersion("dupe", at))
+	kept, evicted := dbstore.InsertVersion(existing, testVersion("dupe", at))
 
 	if len(kept) != 3 {
-		t.Fatalf("insertVersion() kept %d versions, want 3 (no duplicate entry)", len(kept))
+		t.Fatalf("dbstore.InsertVersion() kept %d versions, want 3 (no duplicate entry)", len(kept))
 	}
 	if kept[0].GetVersionId() != "dupe" {
 		t.Errorf("kept[0].VersionId = %q, want %q (moved to newest)", kept[0].GetVersionId(), "dupe")
@@ -162,11 +162,11 @@ func TestInsertVersionDeduplicates(t *testing.T) {
 	}
 	for _, v := range kept[1:] {
 		if v.GetVersionId() == "dupe" {
-			t.Error("insertVersion() left a stale duplicate entry in the index")
+			t.Error("dbstore.InsertVersion() left a stale duplicate entry in the index")
 		}
 	}
 	if len(evicted) != 0 {
-		t.Errorf("insertVersion() evicted %d versions, want 0 (a re-publish evicts nothing)", len(evicted))
+		t.Errorf("dbstore.InsertVersion() evicted %d versions, want 0 (a re-publish evicts nothing)", len(evicted))
 	}
 }
 
@@ -174,9 +174,9 @@ func TestInsertVersionDoesNotMutateInput(t *testing.T) {
 	at := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
 	existing := []*fetchv1.DatabaseVersion{testVersion("old", at.Add(-time.Hour))}
 
-	insertVersion(existing, testVersion("new", at))
+	dbstore.InsertVersion(existing, testVersion("new", at))
 
 	if len(existing) != 1 || existing[0].GetVersionId() != "old" {
-		t.Error("insertVersion() mutated its input slice")
+		t.Error("dbstore.InsertVersion() mutated its input slice")
 	}
 }

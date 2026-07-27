@@ -1,4 +1,4 @@
-package main
+package dbstore
 
 import (
 	"bytes"
@@ -7,16 +7,15 @@ import (
 	"io"
 
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
-	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	"google.golang.org/protobuf/proto"
 )
 
-// encodeIndex serializes the version index for storage: protobuf wire format,
+// EncodeIndex serializes the version index for storage: protobuf wire format,
 // gzip-compressed.
 //
 // The index is a fetchv1.ListResponse rather than a bespoke message so that the
 // fetch service can serve the decoded object straight back to callers.
-func encodeIndex(idx *fetchv1.ListResponse) ([]byte, error) {
+func EncodeIndex(idx *fetchv1.ListResponse) ([]byte, error) {
 	raw, err := proto.Marshal(idx)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling index: %w", err)
@@ -35,8 +34,8 @@ func encodeIndex(idx *fetchv1.ListResponse) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// decodeIndex reverses encodeIndex.
-func decodeIndex(gzipped []byte) (*fetchv1.ListResponse, error) {
+// DecodeIndex reverses EncodeIndex.
+func DecodeIndex(gzipped []byte) (*fetchv1.ListResponse, error) {
 	gz, err := gzip.NewReader(bytes.NewReader(gzipped))
 	if err != nil {
 		return nil, fmt.Errorf("reading index gzip header: %w", err)
@@ -56,8 +55,8 @@ func decodeIndex(gzipped []byte) (*fetchv1.ListResponse, error) {
 	return &idx, nil
 }
 
-// insertVersion returns the version list with v prepended, trimmed to the
-// dbstore.MaxVersions most recent entries. The list is ordered newest-first.
+// InsertVersion returns the version list with v prepended, trimmed to the
+// MaxVersions most recent entries. The list is ordered newest-first.
 //
 // Any existing entry with the same version ID is dropped: republishing an
 // identical database is content-addressed to the same ID, and should refresh
@@ -65,7 +64,7 @@ func decodeIndex(gzipped []byte) (*fetchv1.ListResponse, error) {
 //
 // evicted holds the versions that fell off the end. Their objects are
 // deliberately left in the bucket, so callers should log rather than delete.
-func insertVersion(versions []*fetchv1.DatabaseVersion, v *fetchv1.DatabaseVersion) (kept, evicted []*fetchv1.DatabaseVersion) {
+func InsertVersion(versions []*fetchv1.DatabaseVersion, v *fetchv1.DatabaseVersion) (kept, evicted []*fetchv1.DatabaseVersion) {
 	kept = append(kept, v)
 	for _, old := range versions {
 		if old.GetVersionId() == v.GetVersionId() {
@@ -74,9 +73,9 @@ func insertVersion(versions []*fetchv1.DatabaseVersion, v *fetchv1.DatabaseVersi
 		kept = append(kept, old)
 	}
 
-	if len(kept) > dbstore.MaxVersions {
-		evicted = kept[dbstore.MaxVersions:]
-		kept = kept[:dbstore.MaxVersions:dbstore.MaxVersions]
+	if len(kept) > MaxVersions {
+		evicted = kept[MaxVersions:]
+		kept = kept[:MaxVersions:MaxVersions]
 	}
 
 	return kept, evicted
