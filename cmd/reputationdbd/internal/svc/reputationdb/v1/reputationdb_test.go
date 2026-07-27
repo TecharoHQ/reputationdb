@@ -305,16 +305,23 @@ func TestQueryRejectsAnEmptyBatch(t *testing.T) {
 	}
 }
 
-func TestQueryRejectsAnOversizedBatch(t *testing.T) {
-	s := loadedServer(t, "1.2.3.4/32")
-	waitLoaded(t, s)
-
+// oversizedBatch returns maxBatchSize+1 valid addresses, so that a request
+// built from it is rejected only for its length. A batch of empty strings
+// would also be rejected by the per-item address rule, which would leave the
+// count untested.
+func oversizedBatch() []string {
 	raw := make([]string, maxBatchSize+1)
 	for i := range raw {
 		raw[i] = "1.2.3.4"
 	}
+	return raw
+}
 
-	_, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{IpAddresses: raw}))
+func TestQueryRejectsAnOversizedBatch(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	_, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{IpAddresses: oversizedBatch()}))
 	if got := connect.CodeOf(err); got != connect.CodeInvalidArgument {
 		t.Errorf("Query() code = %v, want %v", got, connect.CodeInvalidArgument)
 	}
@@ -354,7 +361,7 @@ func TestQueryRequestProtoValidation(t *testing.T) {
 		{name: "no addresses", msg: &reputationdbv1.QueryRequest{}, wantErr: true},
 		{
 			name:    "more than the batch limit",
-			msg:     &reputationdbv1.QueryRequest{IpAddresses: make([]string, maxBatchSize+1)},
+			msg:     &reputationdbv1.QueryRequest{IpAddresses: oversizedBatch()},
 			wantErr: true,
 		},
 	} {
