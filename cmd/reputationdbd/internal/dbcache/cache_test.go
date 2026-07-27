@@ -393,9 +393,7 @@ func TestCacheKeepsServingAfterAFailedRefresh(t *testing.T) {
 	publish(t, src, "v1", "1.2.3.4/32")
 
 	c := newCache(t, src, t.TempDir())
-	if err := c.Refresh(t.Context()); err != nil {
-		t.Fatalf("Refresh() error = %v", err)
-	}
+	waitReady(t, c)
 	loadedPath := c.Path()
 
 	publish(t, src, "v2", "5.6.7.8/32")
