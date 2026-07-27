@@ -18,9 +18,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  reputationdbd:
+  build:
     runs-on: ubuntu-24.04
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    name: ${{ matrix.target }}
+
+    strategy:
+      # The images are independent. A broken reputationdbd build says nothing
+      # about caddy-maat, and seeing both failures at once beats finding the
+      # second one only after fixing the first.
+      fail-fast: false
+      matrix:
+        include:
+          # target is the docker-bake.hcl target name; image is what it publishes
+          # as. They differ for caddy, whose target is named after the upstream
+          # project but which ships as caddy-maat.
+          - target: reputationdbd
+            image: ghcr.io/techarohq/reputationdbd
+          - target: caddy
+            image: ghcr.io/techarohq/caddy-maat
 
     permissions:
       contents: read
@@ -37,9 +53,9 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
-      # No setup-qemu-action on purpose. docker/reputationdbd.Dockerfile pins its
-      # build stage to $BUILDPLATFORM and cross-compiles with GOOS/GOARCH, and the
-      # distroless runtime stage only COPYs a file, so nothing foreign-arch is ever
+      # No setup-qemu-action on purpose. Both Dockerfiles under docker/ pin their
+      # build stage to $BUILDPLATFORM and cross-compile with GOOS/GOARCH, and their
+      # runtime stages only COPY a binary in, so nothing foreign-arch is ever
       # executed and there is nothing to emulate.
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
@@ -51,16 +67,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # bake-target makes this emit a bake file that redefines the "reputationdbd"
-      # target rather than a separate one to inherit from. Bake merges definitions
-      # across files, so the tags and labels here land on top of the platforms and
+      # bake-target makes this emit a bake file that redefines the matrix target
+      # rather than a separate one to inherit from. Bake merges definitions across
+      # files, so the tags and labels here land on top of the platforms and
       # dockerfile from docker-bake.hcl without either file knowing about the other.
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ghcr.io/techarohq/reputationdbd
-          bake-target: reputationdbd
+          images: ${{ matrix.image }}
+          bake-target: ${{ matrix.target }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -75,7 +91,7 @@ jobs:
           files: |
             ./docker-bake.hcl
             cwd://${{ steps.meta.outputs.bake-file }}
-          targets: reputationdbd
+          targets: ${{ matrix.target }}
           push: ${{ github.event_name != 'pull_request' }}
           # Pull requests still build both architectures to prove they compile,
           # but there is no registry to push to and a multi-platform result cannot
