@@ -20,6 +20,7 @@ import (
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	simplestorage "github.com/tigrisdata/storage-go/simplestorage"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // indexCacheTTL is how long a fetched version index is served from memory.
@@ -166,4 +167,63 @@ func (s *Server) Info(ctx context.Context, req *connect.Request[fetchv1.InfoRequ
 	}
 
 	return connect.NewResponse(&fetchv1.InfoResponse{Version: version}), nil
+}
+
+const (
+	// presignExpiry is how long a download URL stays usable. Long enough to
+	// download a few hundred megabytes on a bad connection, short enough that a
+	// leaked URL is not a permanent hole in a paid product.
+	presignExpiry = time.Hour
+	// clientLifetime is how long a client should wait before asking for a newer
+	// version. It matches the free tier, and comfortably outlasts the daily
+	// build in .github/workflows/build-database.yml.
+	clientLifetime = 6 * time.Hour
+)
+
+// Fetch returns a time-limited download URL for one database version.
+//
+// A version that has aged out of the index is still served: publish-database
+// leaves evicted objects in the bucket precisely so that a client holding an
+// older version ID can still download it, and README.md promises as much. Only
+// the provenance is gone, so such a response carries the version ID alone.
+func (s *Server) Fetch(ctx context.Context, req *connect.Request[fetchv1.FetchRequest]) (*connect.Response[fetchv1.FetchResponse], error) {
+	id := req.Msg.GetVersionId()
+	if !validVersionID(id) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("version_id must be an unpadded URL-safe base64 SHA-512, as returned by the list endpoint"))
+	}
+
+	idx, err := s.index(ctx)
+	if err != nil {
+		s.lg.ErrorContext(ctx, "can't read the version index", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+
+	key := dbstore.ObjectKey(id)
+
+	version := findVersion(idx, id)
+	if version == nil {
+		exists, err := dbstore.Exists(ctx, s.store, key)
+		if err != nil {
+			s.lg.ErrorContext(ctx, "can't check whether a database object exists", "version_id", id, "err", err)
+			return nil, connect.NewError(connect.CodeUnavailable, err)
+		}
+		if !exists {
+			return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no such database version %q", id))
+		}
+
+		s.lg.InfoContext(ctx, "serving a database version that has aged out of the index", "version_id", id)
+		version = &fetchv1.DatabaseVersion{VersionId: id}
+	}
+
+	url, err := dbstore.PresignGet(ctx, s.store, key, presignExpiry)
+	if err != nil {
+		s.lg.ErrorContext(ctx, "can't presign a database download URL", "version_id", id, "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+
+	return connect.NewResponse(&fetchv1.FetchResponse{
+		Version:      version,
+		PresignedUrl: url,
+		Lifetime:     durationpb.New(clientLifetime),
+	}), nil
 }

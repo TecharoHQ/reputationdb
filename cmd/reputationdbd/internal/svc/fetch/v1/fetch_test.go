@@ -11,10 +11,14 @@ import (
 
 	"connectrpc.com/connect"
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
+	fetchv1connect "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1/fetchv1connect"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore/dbstoretest"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// Compile-time proof that Server can be handed to NewFetchServiceHandler.
+var _ fetchv1connect.FetchServiceHandler = (*Server)(nil)
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -259,5 +263,121 @@ func TestInfoStoreFailureIsUnavailable(t *testing.T) {
 	_, err := s.Info(context.Background(), connect.NewRequest(&fetchv1.InfoRequest{VersionId: id}))
 	if got := connect.CodeOf(err); got != connect.CodeUnavailable {
 		t.Errorf("Info() code = %v, want %v", got, connect.CodeUnavailable)
+	}
+}
+
+func TestFetchReturnsAPresignedURLAndMetadata(t *testing.T) {
+	id := dbstore.VersionID([]byte("a database"))
+
+	store := dbstoretest.New()
+	store.Objects[dbstore.ObjectKey(id)] = []byte("compressed database bytes")
+	seedIndex(t, store, &fetchv1.DatabaseVersion{
+		VersionId:  id,
+		RepoShasum: "0123456789abcdef",
+	})
+
+	s := newServer(store, discardLogger())
+	resp, err := s.Fetch(context.Background(), connect.NewRequest(&fetchv1.FetchRequest{VersionId: id}))
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+
+	if got := resp.Msg.GetVersion().GetVersionId(); got != id {
+		t.Errorf("Fetch() version_id = %q, want %q", got, id)
+	}
+	if got := resp.Msg.GetVersion().GetRepoShasum(); got != "0123456789abcdef" {
+		t.Errorf("Fetch() repo_shasum = %q, want the index entry's", got)
+	}
+	if got := resp.Msg.GetLifetime().AsDuration(); got != clientLifetime {
+		t.Errorf("Fetch() lifetime = %v, want %v", got, clientLifetime)
+	}
+	if !strings.Contains(resp.Msg.GetPresignedUrl(), dbstore.ObjectKey(id)) {
+		t.Errorf("Fetch() presigned_url = %q, want it to address %q", resp.Msg.GetPresignedUrl(), dbstore.ObjectKey(id))
+	}
+	if len(store.Presigns) != 1 || store.Presigns[0] != dbstore.ObjectKey(id) {
+		t.Errorf("Fetch() presigned keys = %v, want [%q]", store.Presigns, dbstore.ObjectKey(id))
+	}
+}
+
+// README.md promises that a version which has aged out of the ten-entry index
+// is still downloadable by a client that knows its ID. Its provenance is gone,
+// so the response carries the ID and nothing else.
+func TestFetchServesAVersionThatAgedOut(t *testing.T) {
+	agedOut := dbstore.VersionID([]byte("an old database"))
+
+	store := dbstoretest.New()
+	store.Objects[dbstore.ObjectKey(agedOut)] = []byte("still here")
+	seedIndex(t, store, &fetchv1.DatabaseVersion{VersionId: dbstore.VersionID([]byte("the current one"))})
+
+	s := newServer(store, discardLogger())
+	resp, err := s.Fetch(context.Background(), connect.NewRequest(&fetchv1.FetchRequest{VersionId: agedOut}))
+	if err != nil {
+		t.Fatalf("Fetch() error = %v, want the aged-out version to still be downloadable", err)
+	}
+
+	if got := resp.Msg.GetVersion().GetVersionId(); got != agedOut {
+		t.Errorf("Fetch() version_id = %q, want %q", got, agedOut)
+	}
+	if got := resp.Msg.GetVersion().GetRepoShasum(); got != "" {
+		t.Errorf("Fetch() repo_shasum = %q, want it empty: the index no longer knows", got)
+	}
+	if !strings.Contains(resp.Msg.GetPresignedUrl(), dbstore.ObjectKey(agedOut)) {
+		t.Errorf("Fetch() presigned_url = %q, want it to address %q", resp.Msg.GetPresignedUrl(), dbstore.ObjectKey(agedOut))
+	}
+}
+
+func TestFetchUnknownVersionIsNotFound(t *testing.T) {
+	store := dbstoretest.New()
+	seedIndex(t, store, &fetchv1.DatabaseVersion{VersionId: dbstore.VersionID([]byte("indexed"))})
+
+	s := newServer(store, discardLogger())
+	missing := dbstore.VersionID([]byte("never published"))
+
+	_, err := s.Fetch(context.Background(), connect.NewRequest(&fetchv1.FetchRequest{VersionId: missing}))
+	if got := connect.CodeOf(err); got != connect.CodeNotFound {
+		t.Errorf("Fetch() code = %v, want %v", got, connect.CodeNotFound)
+	}
+	// A version with no object must never be handed a URL that 404s on download.
+	if len(store.Presigns) != 0 {
+		t.Errorf("Fetch() presigned %v for a version with no object, want none", store.Presigns)
+	}
+}
+
+func TestFetchMalformedVersionIDIsInvalidArgument(t *testing.T) {
+	s := newServer(dbstoretest.New(), discardLogger())
+
+	for _, id := range []string{"", "nonsense", "../../etc/passwd"} {
+		_, err := s.Fetch(context.Background(), connect.NewRequest(&fetchv1.FetchRequest{VersionId: id}))
+		if got := connect.CodeOf(err); got != connect.CodeInvalidArgument {
+			t.Errorf("Fetch(%q) code = %v, want %v", id, got, connect.CodeInvalidArgument)
+		}
+	}
+}
+
+func TestFetchPresignFailureIsUnavailable(t *testing.T) {
+	id := dbstore.VersionID([]byte("a database"))
+
+	store := dbstoretest.New()
+	store.Objects[dbstore.ObjectKey(id)] = []byte("compressed database bytes")
+	seedIndex(t, store, &fetchv1.DatabaseVersion{VersionId: id})
+	store.PresignErr = errors.New("no credentials")
+
+	s := newServer(store, discardLogger())
+	_, err := s.Fetch(context.Background(), connect.NewRequest(&fetchv1.FetchRequest{VersionId: id}))
+	if got := connect.CodeOf(err); got != connect.CodeUnavailable {
+		t.Errorf("Fetch() code = %v, want %v", got, connect.CodeUnavailable)
+	}
+}
+
+func TestFetchStoreFailureIsUnavailable(t *testing.T) {
+	store := dbstoretest.New()
+	store.ListErr = errors.New("network is on fire")
+
+	s := newServer(store, discardLogger())
+	id := dbstore.VersionID([]byte("whatever"))
+
+	_, err := s.Fetch(context.Background(), connect.NewRequest(&fetchv1.FetchRequest{VersionId: id}))
+	if got := connect.CodeOf(err); got != connect.CodeUnavailable {
+		t.Errorf("Fetch() code = %v, want %v", got, connect.CodeUnavailable)
 	}
 }
