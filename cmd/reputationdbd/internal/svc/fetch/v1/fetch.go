@@ -8,6 +8,7 @@ package fetchv1
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -113,4 +114,30 @@ func (s *Server) List(ctx context.Context, req *connect.Request[fetchv1.ListRequ
 	}
 
 	return connect.NewResponse(&fetchv1.ListResponse{Versions: idx.GetVersions()}), nil
+}
+
+// validVersionID reports whether id has the shape dbstore.VersionID produces:
+// 86 characters of unpadded URL-safe base64.
+//
+// ObjectKey concatenates this straight into a bucket key. S3 keys have no path
+// traversal, so a malformed ID is not an escape, but checking the shape before
+// touching the bucket keeps a caller from steering the server at arbitrary
+// keys and turns garbage input into a clear InvalidArgument instead of a
+// puzzling NotFound.
+func validVersionID(id string) bool {
+	if len(id) != dbstore.VersionIDLength {
+		return false
+	}
+	_, err := base64.RawURLEncoding.DecodeString(id)
+	return err == nil
+}
+
+// findVersion returns the index entry for id, or nil if the index has none.
+func findVersion(idx *fetchv1.ListResponse, id string) *fetchv1.DatabaseVersion {
+	for _, v := range idx.GetVersions() {
+		if v.GetVersionId() == id {
+			return v
+		}
+	}
+	return nil
 }

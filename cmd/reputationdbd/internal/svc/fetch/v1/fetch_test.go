@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,5 +143,47 @@ func TestListStoreFailureIsUnavailable(t *testing.T) {
 	_, err := s.List(context.Background(), connect.NewRequest(&fetchv1.ListRequest{}))
 	if got := connect.CodeOf(err); got != connect.CodeUnavailable {
 		t.Errorf("List() code = %v, want %v", got, connect.CodeUnavailable)
+	}
+}
+
+func TestValidVersionID(t *testing.T) {
+	real := dbstore.VersionID([]byte("pretend this is an mmdb"))
+
+	for _, tt := range []struct {
+		name string
+		id   string
+		want bool
+	}{
+		{"a real version ID", real, true},
+		{"empty", "", false},
+		{"too short", real[:85], false},
+		{"too long", real + "A", false},
+		{"standard base64 padding", strings.Repeat("A", 84) + "==", false},
+		{"standard base64 alphabet", strings.Repeat("A", 85) + "+", false},
+		{"path separator", strings.Repeat("A", 85) + "/", false},
+		{"traversal attempt", "../../etc/passwd", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := validVersionID(tt.id); got != tt.want {
+				t.Errorf("validVersionID(%q) = %v, want %v", tt.id, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFindVersion(t *testing.T) {
+	idx := &fetchv1.ListResponse{Versions: []*fetchv1.DatabaseVersion{
+		{VersionId: "a", RepoShasum: "sha-a"},
+		{VersionId: "b", RepoShasum: "sha-b"},
+	}}
+
+	if got := findVersion(idx, "b"); got == nil || got.GetRepoShasum() != "sha-b" {
+		t.Errorf("findVersion(idx, \"b\") = %v, want the entry with repo_shasum sha-b", got)
+	}
+	if got := findVersion(idx, "c"); got != nil {
+		t.Errorf("findVersion(idx, \"c\") = %v, want nil", got)
+	}
+	if got := findVersion(&fetchv1.ListResponse{}, "a"); got != nil {
+		t.Errorf("findVersion(empty, \"a\") = %v, want nil", got)
 	}
 }
