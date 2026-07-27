@@ -32,3 +32,9 @@ go.work.sum
 # .vscode/
 
 node_modules/
+
+# Build scratch. var/.gitignore already covers this for git, but .dockerignore is
+# a symlink to this file and Docker only ever reads the one at the context root --
+# it does not descend into nested ignore files. Without this line every docker
+# build ships the ~1GB of databases under var/ to the daemon.
+var/

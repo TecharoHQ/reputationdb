@@ -1,0 +1,83 @@
+name: Docker
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One build per ref. A superseded push has nothing worth finishing: the image it
+# would publish is already stale by the time it lands.
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reputationdbd:
+    runs-on: ubuntu-24.04
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+
+    permissions:
+      contents: read
+      # Pushing to ghcr.io under this repository's namespace.
+      packages: write
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          # Go stamps Main.Version from VCS tags into debug.BuildInfo, which is
+          # what web/useragent reports as the outbound User-Agent version. A
+          # shallow, tagless clone stamps "(devel)" instead.
+          fetch-tags: true
+          fetch-depth: 0
+
+      # No setup-qemu-action on purpose. docker/reputationdbd.Dockerfile pins its
+      # build stage to $BUILDPLATFORM and cross-compiles with GOOS/GOARCH, and the
+      # distroless runtime stage only COPYs a file, so nothing foreign-arch is ever
+      # executed and there is nothing to emulate.
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to ghcr.io
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4.5.1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # bake-target makes this emit a bake file that redefines the "reputationdbd"
+      # target rather than a separate one to inherit from. Bake merges definitions
+      # across files, so the tags and labels here land on top of the platforms and
+      # dockerfile from docker-bake.hcl without either file knowing about the other.
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/techarohq/reputationdbd
+          bake-target: reputationdbd
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
+        with:
+          files: |
+            ./docker-bake.hcl
+            cwd://${{ steps.meta.outputs.bake-file }}
+          targets: reputationdbd
+          push: ${{ github.event_name != 'pull_request' }}
+          # Pull requests still build both architectures to prove they compile,
+          # but there is no registry to push to and a multi-platform result cannot
+          # be loaded into the local image store, so throw the images away.
+          set: ${{ github.event_name == 'pull_request' && '*.output=type=cacheonly' || '' }}
