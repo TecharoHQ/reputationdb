@@ -84,8 +84,12 @@ type Cache struct {
 	createdAt time.Time
 }
 
-// New returns a cache that keeps itself fresh until ctx is cancelled or Close
-// is called.
+// New returns a cache that refreshes itself in the background until ctx is
+// cancelled or Close is called.
+//
+// Those two are not interchangeable for teardown: cancelling ctx stops the
+// refresh loop, but only Close releases the memory mapping. A caller that
+// wants the ~800 MiB mapping back before the process exits must call Close.
 //
 // It does not wait for the database: the full build is around 800 MiB, and
 // holding the whole server up for that long — or refusing to start because the
