@@ -13,11 +13,20 @@
 package reputationdbv1
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/netip"
 
+	"connectrpc.com/connect"
 	"github.com/TecharoHQ/reputationdb"
+	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal"
+	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/dbcache"
 	reputationdbv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/v1"
+	reputationdbv1connect "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/v1/reputationdbv1connect"
+	simplestorage "github.com/tigrisdata/storage-go/simplestorage"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // parseAddrs turns the requested strings into the addresses to look up,
@@ -75,3 +84,99 @@ func toRecord(ipAddress string, res reputationdb.Result) *reputationdbv1.Record 
 		Sources:      sources,
 	}
 }
+
+// maxBatchSize is how many addresses one request may ask about. The proto tells
+// protovalidate the same thing, so oversized requests are rejected at the
+// interceptor before they reach here; the check is repeated because this
+// handler is also called directly, without that interceptor, by tests and by
+// any future in-process caller.
+const maxBatchSize = 100
+
+// Server implements reputationdbv1connect.ReputationServiceHandler.
+type Server struct {
+	cache *dbcache.Cache
+	lg    *slog.Logger
+}
+
+// New builds a Server backed by a local, self-refreshing copy of the newest
+// database in the configured Tigris bucket.
+//
+// It returns as soon as the cache is started; the first download runs in the
+// background and takes minutes. Queries answer Unavailable until it lands.
+func New(ctx context.Context, lg *slog.Logger, cfg *internal.Config) (*Server, error) {
+	// An empty bucket name is left unset rather than passed through, so that
+	// simplestorage falls back to TIGRIS_STORAGE_BUCKET instead of failing on a
+	// bucket literally named "".
+	var opts []simplestorage.Option
+	if cfg.TigrisBucket != "" {
+		opts = append(opts, simplestorage.WithBucket(cfg.TigrisBucket))
+	}
+
+	st, err := simplestorage.New(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating Tigris client: %w", err)
+	}
+
+	lg = lg.With("handler", "reputationdbv1")
+
+	cache, err := dbcache.New(ctx, lg, dbcache.NewBucketSource(st, lg), cfg.DatabaseCacheDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return newServer(cache, lg), nil
+}
+
+// newServer wraps an arbitrary cache, so tests can supply one backed by a fake
+// source.
+func newServer(cache *dbcache.Cache, lg *slog.Logger) *Server {
+	return &Server{cache: cache, lg: lg}
+}
+
+// Query looks a batch of addresses up in the database.
+//
+// Addresses with no record are omitted from the response rather than returned
+// empty, so a client can treat the presence of a record as the signal.
+func (s *Server) Query(ctx context.Context, req *connect.Request[reputationdbv1.QueryRequest]) (*connect.Response[reputationdbv1.QueryResponse], error) {
+	raw := req.Msg.GetIpAddresses()
+	if len(raw) == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			errors.New("ip_addresses must contain at least one IP address"))
+	}
+	if len(raw) > maxBatchSize {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("ip_addresses contains %d addresses, the limit is %d", len(raw), maxBatchSize))
+	}
+
+	addrs, inputs, err := parseAddrs(raw)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	matches, createdAt, loaded, err := s.cache.Query(addrs)
+	if !loaded {
+		// Saying "none of these are listed" out of a database that isn't there
+		// would be a fail-open the caller can't detect.
+		return nil, connect.NewError(connect.CodeUnavailable,
+			errors.New("no reputation database has been loaded yet, try again shortly"))
+	}
+	if err != nil {
+		s.lg.ErrorContext(ctx, "can't query the reputation database", "err", err)
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	records := make([]*reputationdbv1.Record, 0, len(matches))
+	for _, m := range matches {
+		records = append(records, toRecord(inputs[m.Addr], m.Result))
+	}
+
+	return connect.NewResponse(&reputationdbv1.QueryResponse{
+		DatabaseCreatedAt: timestamppb.New(createdAt),
+		Records:           records,
+	}), nil
+}
+
+// Interface guards
+var (
+	_ reputationdbv1connect.ReputationServiceHandler = (*Server)(nil)
+)

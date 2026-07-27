@@ -1,9 +1,19 @@
 package reputationdbv1
 
 import (
+	"context"
+	"io"
+	"log/slog"
 	"testing"
+	"time"
 
+	"buf.build/go/protovalidate"
+	"connectrpc.com/connect"
 	"github.com/TecharoHQ/reputationdb"
+	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/dbcache"
+	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/dbcache/dbcachetest"
+	reputationdbv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/v1"
+	reputationdbv1connect "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/v1/reputationdbv1connect"
 )
 
 func TestParseAddrs(t *testing.T) {
@@ -149,5 +159,213 @@ func TestToRecordWithNoSources(t *testing.T) {
 	}
 	if len(got.GetSources()) != 0 {
 		t.Errorf("Sources = %v, want it empty", got.GetSources())
+	}
+}
+
+// Compile-time proof that Server can be handed to NewReputationServiceHandler.
+var _ reputationdbv1connect.ReputationServiceHandler = (*Server)(nil)
+
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewJSONHandler(io.Discard, nil))
+}
+
+// loadedServer returns a Server whose cache has finished loading a database
+// containing the given CIDRs.
+func loadedServer(t *testing.T, cidrs ...string) *Server {
+	t.Helper()
+
+	compressed, err := dbcachetest.CompressedDatabase(cidrs...)
+	if err != nil {
+		t.Fatalf("CompressedDatabase: %v", err)
+	}
+
+	src := dbcachetest.New()
+	src.Publish("v1", time.Date(2026, 7, 25, 6, 0, 0, 0, time.UTC), compressed)
+
+	return newServerWithCache(t, src)
+}
+
+// emptyServer returns a Server whose cache will never load anything.
+func emptyServer(t *testing.T) *Server {
+	t.Helper()
+	return newServerWithCache(t, dbcachetest.New())
+}
+
+func newServerWithCache(t *testing.T, src *dbcachetest.Fake) *Server {
+	t.Helper()
+
+	cache, err := dbcache.New(t.Context(), discardLogger(), src, t.TempDir())
+	if err != nil {
+		t.Fatalf("dbcache.New: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("cache.Close() error = %v", err)
+		}
+	})
+
+	return newServer(cache, discardLogger())
+}
+
+// waitLoaded blocks until the server's cache has a database.
+func waitLoaded(t *testing.T, s *Server) {
+	t.Helper()
+
+	select {
+	case <-s.cache.Ready():
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for the database to load")
+	}
+}
+
+func TestQueryReturnsRecordsForListedAddresses(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	resp, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{
+		IpAddresses: []string{"1.2.3.4"},
+	}))
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+
+	records := resp.Msg.GetRecords()
+	if len(records) != 1 {
+		t.Fatalf("Query() returned %d records, want 1", len(records))
+	}
+	if got := records[0].GetIpAddress(); got != "1.2.3.4" {
+		t.Errorf("Query() ip_address = %q, want %q", got, "1.2.3.4")
+	}
+	if !records[0].GetIsDatacenter() {
+		t.Error("Query() is_datacenter = false, want true for a datacentre address")
+	}
+
+	want := time.Date(2026, 7, 25, 6, 0, 0, 0, time.UTC)
+	if got := resp.Msg.GetDatabaseCreatedAt().AsTime(); !got.Equal(want) {
+		t.Errorf("Query() database_created_at = %v, want %v", got, want)
+	}
+}
+
+// Addresses with no record are omitted rather than returned empty, so a client
+// can treat the presence of a record as the signal.
+func TestQueryOmitsAddressesWithNoRecord(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	resp, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{
+		IpAddresses: []string{"1.2.3.4", "9.9.9.9"},
+	}))
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+
+	records := resp.Msg.GetRecords()
+	if len(records) != 1 {
+		t.Fatalf("Query() returned %d records, want 1: 9.9.9.9 is not in the database", len(records))
+	}
+	if records[0].GetIpAddress() != "1.2.3.4" {
+		t.Errorf("Query() returned a record for %q, want 1.2.3.4", records[0].GetIpAddress())
+	}
+}
+
+// Answering "nothing is listed" out of a database that hasn't loaded would be a
+// fail-open the caller can't detect.
+func TestQueryBeforeTheDatabaseLoadsIsUnavailable(t *testing.T) {
+	s := emptyServer(t)
+
+	_, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{
+		IpAddresses: []string{"1.2.3.4"},
+	}))
+	if got := connect.CodeOf(err); got != connect.CodeUnavailable {
+		t.Errorf("Query() code = %v, want %v", got, connect.CodeUnavailable)
+	}
+}
+
+func TestQueryRejectsMalformedAddresses(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	for _, raw := range []string{"nonsense", "1.2.3.0/24", "1.2.3.4:80", ""} {
+		_, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{
+			IpAddresses: []string{raw},
+		}))
+		if got := connect.CodeOf(err); got != connect.CodeInvalidArgument {
+			t.Errorf("Query(%q) code = %v, want %v", raw, got, connect.CodeInvalidArgument)
+		}
+	}
+}
+
+func TestQueryRejectsAnEmptyBatch(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	_, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{}))
+	if got := connect.CodeOf(err); got != connect.CodeInvalidArgument {
+		t.Errorf("Query() code = %v, want %v", got, connect.CodeInvalidArgument)
+	}
+}
+
+func TestQueryRejectsAnOversizedBatch(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	raw := make([]string, maxBatchSize+1)
+	for i := range raw {
+		raw[i] = "1.2.3.4"
+	}
+
+	_, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{IpAddresses: raw}))
+	if got := connect.CodeOf(err); got != connect.CodeInvalidArgument {
+		t.Errorf("Query() code = %v, want %v", got, connect.CodeInvalidArgument)
+	}
+}
+
+func TestQueryDedupesAddresses(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	resp, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{
+		IpAddresses: []string{"1.2.3.4", "1.2.3.4", "::ffff:1.2.3.4"},
+	}))
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if got := len(resp.Msg.GetRecords()); got != 1 {
+		t.Errorf("Query() returned %d records for three spellings of one address, want 1", got)
+	}
+}
+
+// The proto's per-item CEL rule is easy to break back into a field-level rule,
+// which silently rejects every request. Guard it here.
+func TestQueryRequestProtoValidation(t *testing.T) {
+	v, err := protovalidate.New()
+	if err != nil {
+		t.Fatalf("protovalidate.New() error = %v", err)
+	}
+
+	for _, tt := range []struct {
+		name    string
+		msg     *reputationdbv1.QueryRequest
+		wantErr bool
+	}{
+		{name: "one valid address", msg: &reputationdbv1.QueryRequest{IpAddresses: []string{"1.2.3.4"}}},
+		{name: "an IPv6 address", msg: &reputationdbv1.QueryRequest{IpAddresses: []string{"2001:db8::1"}}},
+		{name: "not an address", msg: &reputationdbv1.QueryRequest{IpAddresses: []string{"nonsense"}}, wantErr: true},
+		{name: "no addresses", msg: &reputationdbv1.QueryRequest{}, wantErr: true},
+		{
+			name:    "more than the batch limit",
+			msg:     &reputationdbv1.QueryRequest{IpAddresses: make([]string, maxBatchSize+1)},
+			wantErr: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.Validate(tt.msg)
+			if tt.wantErr && err == nil {
+				t.Error("Validate() error = nil, want a validation failure")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("Validate() error = %v, want nil", err)
+			}
+		})
 	}
 }

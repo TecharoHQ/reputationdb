@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260709200747-435963d16310.1
+	buf.build/go/protovalidate v1.1.2
 	connectrpc.com/connect v1.20.0
 	connectrpc.com/validate v0.6.0
 	connectrpc.com/vanguard v0.4.0
@@ -28,7 +29,6 @@ require (
 )
 
 require (
-	buf.build/go/protovalidate v1.1.2 // indirect
 	cel.dev/expr v0.25.1 // indirect
 	charm.land/lipgloss/v2 v2.0.0-beta.3.0.20251120230642-dcccabe2cd63 // indirect
 	cloud.google.com/go/auth v0.20.0 // indirect
