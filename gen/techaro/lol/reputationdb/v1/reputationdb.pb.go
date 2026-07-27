@@ -295,10 +295,10 @@ var File_techaro_lol_reputationdb_v1_reputationdb_proto protoreflect.FileDescrip
 
 const file_techaro_lol_reputationdb_v1_reputationdb_proto_rawDesc = "" +
 	"\n" +
-	".techaro/lol/reputationdb/v1/reputationdb.proto\x12\x1btecharo.lol.reputationdb.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x03\n" +
-	"\fQueryRequest\x12\xcd\x01\n" +
-	"\fip_addresses\x18\x01 \x03(\tB\xa9\x01\xbaGTJ\fIP addressesY\x00\x00\x00\x00\x00\x00Y@i\x00\x00\x00\x00\x00\x00\xf0?\x92\x021IP addresses in string format without CIDR prefix\xbaHO\xba\x01I\n" +
-	"\x18ip_address.is_ip_address\x12 ip_address must be an IP address\x1a\vthis.isIp()\xc8\x01\x01R\vipAddresses:\xc0\x01\xbaG\xae\x01J\rQuery Request\x92\x02\x9b\x01A batch of IP addresses to look up in the reputation database. Addresses that have no record are omitted from the response instead of being returned empty.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xdd\x05\n" +
+	".techaro/lol/reputationdb/v1/reputationdb.proto\x12\x1btecharo.lol.reputationdb.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaa\x03\n" +
+	"\fQueryRequest\x12\xd6\x01\n" +
+	"\fip_addresses\x18\x01 \x03(\tB\xb2\x01\xbaGTJ\fIP addressesY\x00\x00\x00\x00\x00\x00Y@i\x00\x00\x00\x00\x00\x00\xf0?\x92\x021IP addresses in string format without CIDR prefix\xbaHX\xc8\x01\x01\x92\x01R\b\x01\x10d\"L\xba\x01I\n" +
+	"\x18ip_address.is_ip_address\x12 ip_address must be an IP address\x1a\vthis.isIp()R\vipAddresses:\xc0\x01\xbaG\xae\x01J\rQuery Request\x92\x02\x9b\x01A batch of IP addresses to look up in the reputation database. Addresses that have no record are omitted from the response instead of being returned empty.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xdd\x05\n" +
 	"\x0eListMembership\x12\xa9\x01\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tB\x88\x01\xbaG\x84\x01J\n" +

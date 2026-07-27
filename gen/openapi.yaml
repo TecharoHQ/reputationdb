@@ -410,6 +410,8 @@ components:
           title: IP addresses
           maximum: 100
           minimum: 1
+          maxItems: 100
+          minItems: 1
           description: IP addresses in string format without CIDR prefix
       title: Query Request
       required:
