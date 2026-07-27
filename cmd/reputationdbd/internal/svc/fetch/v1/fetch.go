@@ -9,6 +9,7 @@ package fetchv1
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -140,4 +141,29 @@ func findVersion(idx *fetchv1.ListResponse, id string) *fetchv1.DatabaseVersion 
 		}
 	}
 	return nil
+}
+
+// Info returns the metadata the index holds for one database version.
+//
+// Unlike Fetch, this does not fall back to the bucket for a version that has
+// aged out of the index: the whole point of this endpoint is the provenance,
+// and that provenance is gone with the index entry.
+func (s *Server) Info(ctx context.Context, req *connect.Request[fetchv1.InfoRequest]) (*connect.Response[fetchv1.InfoResponse], error) {
+	id := req.Msg.GetVersionId()
+	if !validVersionID(id) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("version_id must be an unpadded URL-safe base64 SHA-512, as returned by the list endpoint"))
+	}
+
+	idx, err := s.index(ctx)
+	if err != nil {
+		s.lg.ErrorContext(ctx, "can't read the version index", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+
+	version := findVersion(idx, id)
+	if version == nil {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("no metadata for database version %q", id))
+	}
+
+	return connect.NewResponse(&fetchv1.InfoResponse{Version: version}), nil
 }

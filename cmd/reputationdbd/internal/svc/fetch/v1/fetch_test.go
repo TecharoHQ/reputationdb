@@ -13,6 +13,7 @@ import (
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore/dbstoretest"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func discardLogger() *slog.Logger {
@@ -185,5 +186,78 @@ func TestFindVersion(t *testing.T) {
 	}
 	if got := findVersion(&fetchv1.ListResponse{}, "a"); got != nil {
 		t.Errorf("findVersion(empty, \"a\") = %v, want nil", got)
+	}
+}
+
+func TestInfoReturnsVersionMetadata(t *testing.T) {
+	id := dbstore.VersionID([]byte("a database"))
+	published := time.Date(2026, 7, 20, 6, 0, 0, 0, time.UTC)
+
+	store := dbstoretest.New()
+	seedIndex(t, store, &fetchv1.DatabaseVersion{
+		VersionId:         id,
+		RepoShasum:        "0123456789abcdef",
+		RepoCommitMessage: "feat: add a source",
+		CreatedAt:         timestamppb.New(published),
+	})
+
+	s := newServer(store, discardLogger())
+	resp, err := s.Info(context.Background(), connect.NewRequest(&fetchv1.InfoRequest{VersionId: id}))
+	if err != nil {
+		t.Fatalf("Info() error = %v", err)
+	}
+
+	got := resp.Msg.GetVersion()
+	if got.GetVersionId() != id {
+		t.Errorf("Info() version_id = %q, want %q", got.GetVersionId(), id)
+	}
+	if got.GetRepoShasum() != "0123456789abcdef" {
+		t.Errorf("Info() repo_shasum = %q, want %q", got.GetRepoShasum(), "0123456789abcdef")
+	}
+	if got.GetRepoCommitMessage() != "feat: add a source" {
+		t.Errorf("Info() repo_commit_message = %q, want %q", got.GetRepoCommitMessage(), "feat: add a source")
+	}
+	if !got.GetCreatedAt().AsTime().Equal(published) {
+		t.Errorf("Info() created_at = %v, want %v", got.GetCreatedAt().AsTime(), published)
+	}
+}
+
+func TestInfoMalformedVersionIDIsInvalidArgument(t *testing.T) {
+	s := newServer(dbstoretest.New(), discardLogger())
+
+	for _, id := range []string{"", "nonsense", "../../etc/passwd"} {
+		_, err := s.Info(context.Background(), connect.NewRequest(&fetchv1.InfoRequest{VersionId: id}))
+		if got := connect.CodeOf(err); got != connect.CodeInvalidArgument {
+			t.Errorf("Info(%q) code = %v, want %v", id, got, connect.CodeInvalidArgument)
+		}
+	}
+}
+
+// Info reports metadata, and a version that has aged out of the index has none
+// left to report, even though its object is still in the bucket. Fetch is the
+// endpoint that still serves those; see TestFetchServesAVersionThatAgedOut.
+func TestInfoUnknownVersionIsNotFound(t *testing.T) {
+	store := dbstoretest.New()
+	seedIndex(t, store, &fetchv1.DatabaseVersion{VersionId: dbstore.VersionID([]byte("indexed"))})
+
+	s := newServer(store, discardLogger())
+	missing := dbstore.VersionID([]byte("never published"))
+
+	_, err := s.Info(context.Background(), connect.NewRequest(&fetchv1.InfoRequest{VersionId: missing}))
+	if got := connect.CodeOf(err); got != connect.CodeNotFound {
+		t.Errorf("Info() code = %v, want %v", got, connect.CodeNotFound)
+	}
+}
+
+func TestInfoStoreFailureIsUnavailable(t *testing.T) {
+	store := dbstoretest.New()
+	store.ListErr = errors.New("network is on fire")
+
+	s := newServer(store, discardLogger())
+	id := dbstore.VersionID([]byte("whatever"))
+
+	_, err := s.Info(context.Background(), connect.NewRequest(&fetchv1.InfoRequest{VersionId: id}))
+	if got := connect.CodeOf(err); got != connect.CodeUnavailable {
+		t.Errorf("Info() code = %v, want %v", got, connect.CodeUnavailable)
 	}
 }
