@@ -12,6 +12,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -29,8 +30,9 @@ var (
 	metricsBind = flag.String("metrics-bind", ":9090", "TCP address to serve the Prometheus /metrics endpoint; empty disables it")
 	slogLevel   = flag.String("slog-level", "info", "Logging level")
 
-	githubToken  = flag.String("github-token", "", "GitHub API token")
-	tigrisBucket = flag.String("tigris-storage-bucket", "techaro-reputationdb", "Tigris bucket holding the published databases")
+	githubToken      = flag.String("github-token", "", "GitHub API token")
+	tigrisBucket     = flag.String("tigris-storage-bucket", "techaro-reputationdb", "Tigris bucket holding the published databases")
+	databaseCacheDir = flag.String("database-cache-dir", filepath.Join(os.TempDir(), "reputationdb"), "directory the local copy of the reputation database is cached in")
 )
 
 func main() {
@@ -52,8 +54,9 @@ func main() {
 
 func run(ctx context.Context, lg *slog.Logger) error {
 	cfg := &internal.Config{
-		GitHubToken:  *githubToken,
-		TigrisBucket: *tigrisBucket,
+		GitHubToken:      *githubToken,
+		TigrisBucket:     *tigrisBucket,
+		DatabaseCacheDir: *databaseCacheDir,
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)

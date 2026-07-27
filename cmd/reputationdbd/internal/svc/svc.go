@@ -13,9 +13,11 @@ import (
 	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal"
 	fetchv1 "github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/svc/fetch/v1"
 	freefetchv1 "github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/svc/freefetch/v1"
+	reputationdbv1 "github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/svc/reputationdb/v1"
 	"github.com/TecharoHQ/reputationdb/gen"
 	fetchv1connect "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1/fetchv1connect"
 	freefetchv1connect "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/free/fetch/v1/fetchv1connect"
+	reputationdbv1connect "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/v1/reputationdbv1connect"
 	"github.com/mdigger/rpclog"
 )
 
@@ -50,6 +52,22 @@ func Route(ctx context.Context, lg *slog.Logger, cfg *internal.Config) (http.Han
 
 		path, handler := fetchv1connect.NewFetchServiceHandler(
 			fetchSvc,
+			connect.WithInterceptors(logger, validate.NewInterceptor()),
+		)
+		mux.Handle(path, handler)
+
+		svc := vanguard.NewService(path, handler)
+		svcs = append(svcs, svc)
+	}
+
+	{
+		reputationSvc, err := reputationdbv1.New(ctx, lg, cfg)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("can't construct reputationdbv1 service: %w", err))
+		}
+
+		path, handler := reputationdbv1connect.NewReputationServiceHandler(
+			reputationSvc,
 			connect.WithInterceptors(logger, validate.NewInterceptor()),
 		)
 		mux.Handle(path, handler)
