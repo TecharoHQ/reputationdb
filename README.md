@@ -10,11 +10,61 @@ After thought and introspection, I think a better way to do this is to make the 
 
 ## API
 
-If you have a Thoth API key, you can use it to query entries at $TODO.techaro.lol:
+`POST /api/v1/query` looks a batch of up to 100 IP addresses up in the database:
 
 ```text
-TODO: curl example once the API service is functional
+curl -s localhost:3823/api/v1/query \
+  -H 'Content-Type: application/json' \
+  -d '{"ip_addresses":["1.2.3.4","2001:db8::1"]}'
 ```
+
+```json
+{
+  "databaseCreatedAt": "2026-07-25T06:00:00Z",
+  "records": [
+    {
+      "ipAddress": "1.2.3.4",
+      "isDatacenter": true,
+      "categories": ["datacenter"],
+      "providers": ["datacentres"],
+      "sources": [
+        {
+          "repository": "github.com/hexydec/ip-ranges",
+          "list": "output/datacentres.txt",
+          "provider": "datacentres",
+          "category": "datacenter"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Addresses with no record are **omitted** from `records` rather than returned
+empty, so the presence of a record is the signal. Each `ipAddress` echoes the
+string you sent, so you can match records back to your request; duplicate
+spellings of one address collapse to a single record. `databaseCreatedAt` is
+when the database snapshot serving the query was published, so you can tell how
+stale the answer is.
+
+Two shape details worth knowing before you parse this, both verified against a
+running server:
+
+- **Fields that are absent are false or empty.** A record for an address that
+  is only a datacentre address carries `isDatacenter` and no `isVpn`,
+  `isCrawler`, or `isProxy` key at all — not `"isVpn": false`.
+- **`records` disappears entirely when nothing matches.** A query where none of
+  the addresses are listed returns just
+  `{"databaseCreatedAt": "..."}` — no `records` key, not `"records": []`. Code
+  that reaches straight for `response.records.length` will trip over this;
+  treat a missing `records` as an empty list.
+
+The server keeps its own copy of the newest published database and swaps in a
+newer one when it appears. On a cold start that copy takes a few minutes to
+download, and until it lands `/api/v1/query` returns `503 Unavailable` rather
+than reporting every address as clean.
+
+This endpoint is not authenticated yet.
 
 ### Accessing the database builds
 
@@ -112,6 +162,13 @@ var), defaulting to `techaro-reputationdb`, so they point at one bucket by
 default. It also needs the same Tigris credentials in `.env` and `-github-token`
 (or `GITHUB_TOKEN`) to serve the free datacentre database, whose download URL
 comes from the GitHub release rather than from Tigris.
+
+`/api/v1/query` is served out of a local copy of the newest published database,
+cached under `-database-cache-dir` (or `DATABASE_CACHE_DIR`), which defaults to
+`reputationdb` under the system temporary directory. The full database is around
+800 MiB uncompressed, so that path needs room for it. Point the flag at a
+mounted volume if you'd rather not re-download it on every restart — the cache
+is content-addressed, so an unchanged build is reused rather than fetched again.
 
 It listens on `-bind` (`:3823`) for the API and `-metrics-bind` (`:9090`) for
 Prometheus metrics and pprof. `GET /api/openapi.yaml` serves the OpenAPI
