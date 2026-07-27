@@ -61,7 +61,7 @@ func main() {
 	}
 }
 
-func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) error {
+func run(ctx context.Context, lg *slog.Logger, st dbstore.Store, dbPath string) error {
 	raw, err := os.ReadFile(dbPath)
 	if err != nil {
 		return fmt.Errorf("reading database %s: %w", dbPath, err)
@@ -84,7 +84,7 @@ func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) er
 	}
 	lg.Info("compressed database", "bytes", len(compressed), "ratio", fmt.Sprintf("%.2f", float64(len(compressed))/float64(len(raw))))
 
-	if err := putDatabase(ctx, st, key, compressed); err != nil {
+	if err := dbstore.PutDatabase(ctx, st, key, compressed); err != nil {
 		return err
 	}
 	lg.Info("uploaded database", "bucket", *tigrisBucket, "key", key)
@@ -93,7 +93,7 @@ func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) er
 	// exists, so a failed upload can never leave the index advertising a
 	// missing database: read-modify-write on the index is the smallest
 	// possible window, right before the write.
-	idx, err := loadIndex(ctx, st, lg)
+	idx, err := dbstore.LoadIndex(ctx, st, lg)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) er
 		VersionId:         id,
 	})
 
-	if err := saveIndex(ctx, st, &fetchv1.ListResponse{Versions: kept}); err != nil {
+	if err := dbstore.SaveIndex(ctx, st, &fetchv1.ListResponse{Versions: kept}); err != nil {
 		return err
 	}
 
