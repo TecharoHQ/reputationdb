@@ -18,7 +18,34 @@ TODO: curl example once the API service is functional
 
 ### Accessing the database builds
 
-Fetch a presigned database download link by $TODO through the API.
+`reputationdbd` serves the published database versions. Three endpoints, all
+under `/api/v1/database`:
+
+```text
+GET /api/v1/database                      # every retained version, newest first
+GET /api/v1/database/{version_id}/info    # metadata for one version
+GET /api/v1/database/{version_id}/fetch   # a presigned download URL for one version
+```
+
+A version ID is the unpadded URL-safe base64 SHA-512 of the uncompressed
+database, which is also what names its object in the bucket. List the versions,
+pick one, and fetch it:
+
+```text
+curl -s localhost:3823/api/v1/database
+curl -s localhost:3823/api/v1/database/<version-id>/fetch
+```
+
+The `presignedUrl` in that response expires after an hour, so fetch it again
+rather than caching the URL itself. `lifetime` is how long to wait before
+checking for a newer version; the database is rebuilt daily.
+
+`info` only answers for versions still in the ten-entry index. `fetch` also
+serves versions that have aged out of it — their objects stay in the bucket —
+but the response then carries only the version ID, because the provenance went
+with the index entry.
+
+These endpoints are not authenticated yet.
 
 Anubis will automatically do this once $MILESTONE is reached.
 
@@ -72,4 +99,19 @@ fetch a version ID they already know.
 
 ## Self-hosting the API
 
-TODO: write this once the API server is written.
+`cmd/reputationdbd` serves the API:
+
+```text
+go build -o ./var/reputationdbd ./cmd/reputationdbd
+./var/reputationdbd
+```
+
+It reads the same Tigris bucket `publish-database` writes to, via
+`-tigris-bucket` (or `TIGRIS_BUCKET`), defaulting to `techaro-reputationdb`,
+and needs the same Tigris credentials in `.env`. It also needs `-github-token`
+(or `GITHUB_TOKEN`) to serve the free datacentre database, whose download URL
+comes from the GitHub release rather than from Tigris.
+
+It listens on `-bind` (`:3823`) for the API and `-metrics-bind` (`:9090`) for
+Prometheus metrics and pprof. `GET /api/openapi.yaml` serves the OpenAPI
+description of everything above.
