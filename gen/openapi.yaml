@@ -22,7 +22,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/techaro.lol.reputationdb.fetch.v1.ListResponse'
+                $ref: "#/components/schemas/techaro.lol.reputationdb.fetch.v1.ListResponse"
   /api/v1/database/free/fetch:
     get:
       tags:
@@ -35,7 +35,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/techaro.lol.reputationdb.free.fetch.v1.FetchResponse'
+                $ref: "#/components/schemas/techaro.lol.reputationdb.free.fetch.v1.FetchResponse"
   /api/v1/database/{version_id}/fetch:
     get:
       tags:
@@ -56,7 +56,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/techaro.lol.reputationdb.fetch.v1.FetchResponse'
+                $ref: "#/components/schemas/techaro.lol.reputationdb.fetch.v1.FetchResponse"
   /api/v1/database/{version_id}/info:
     get:
       tags:
@@ -77,7 +77,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/techaro.lol.reputationdb.fetch.v1.InfoResponse'
+                $ref: "#/components/schemas/techaro.lol.reputationdb.fetch.v1.InfoResponse"
   /api/v1/query:
     post:
       tags:
@@ -88,10 +88,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/techaro.lol.reputationdb.v1.QueryRequest'
+              $ref: "#/components/schemas/techaro.lol.reputationdb.v1.QueryRequest"
           application/proto:
             schema:
-              $ref: '#/components/schemas/techaro.lol.reputationdb.v1.QueryRequest'
+              $ref: "#/components/schemas/techaro.lol.reputationdb.v1.QueryRequest"
         required: true
       responses:
         "200":
@@ -99,7 +99,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/techaro.lol.reputationdb.v1.QueryResponse'
+                $ref: "#/components/schemas/techaro.lol.reputationdb.v1.QueryResponse"
 components:
   schemas:
     google.protobuf.Duration:
@@ -266,7 +266,7 @@ components:
         created_at:
           title: Created At
           description: When this version was published, in UTC
-          $ref: '#/components/schemas/google.protobuf.Timestamp'
+          $ref: "#/components/schemas/google.protobuf.Timestamp"
         repo_shasum:
           type: string
           title: Repository Commit SHA
@@ -278,7 +278,7 @@ components:
         version_id:
           type: string
           title: Version ID
-          description: 'The identity of the database contents: the unpadded URL-safe base64 encoding of the SHA-512 of the uncompressed database. Republishing identical contents yields the same version ID.'
+          description: "The identity of the database contents: the unpadded URL-safe base64 encoding of the SHA-512 of the uncompressed database. Republishing identical contents yields the same version ID."
       title: Database Version
       additionalProperties: false
       description: Metadata about a single published database version, including the data repository commit it was built from.
@@ -298,7 +298,7 @@ components:
         version:
           title: Version
           description: Metadata about the database version being downloaded
-          $ref: '#/components/schemas/techaro.lol.reputationdb.fetch.v1.DatabaseVersion'
+          $ref: "#/components/schemas/techaro.lol.reputationdb.fetch.v1.DatabaseVersion"
         presigned_url:
           type: string
           title: Presigned URL
@@ -306,7 +306,7 @@ components:
         lifetime:
           title: Lifetime
           description: How long the client should wait before checking for a newer database version
-          $ref: '#/components/schemas/google.protobuf.Duration'
+          $ref: "#/components/schemas/google.protobuf.Duration"
       title: Fetch Response
       additionalProperties: false
       description: A time-limited download URL for a database version, plus how long the client should wait before checking for a newer one.
@@ -326,7 +326,7 @@ components:
         version:
           title: Version
           description: Metadata about the requested database version
-          $ref: '#/components/schemas/techaro.lol.reputationdb.fetch.v1.DatabaseVersion'
+          $ref: "#/components/schemas/techaro.lol.reputationdb.fetch.v1.DatabaseVersion"
       title: Info Response
       additionalProperties: false
       description: Metadata about one published database version.
@@ -341,7 +341,7 @@ components:
         versions:
           type: array
           items:
-            $ref: '#/components/schemas/techaro.lol.reputationdb.fetch.v1.DatabaseVersion'
+            $ref: "#/components/schemas/techaro.lol.reputationdb.fetch.v1.DatabaseVersion"
           title: Versions
           description: The retained database versions, ordered newest first and capped at the ten most recent
       title: List Response
@@ -351,14 +351,14 @@ components:
       type: object
       title: Free Fetch Request
       additionalProperties: false
-      description: 'A request for a download URL for the current free datacentre-only database. Takes no parameters: the free tier always serves the latest build rather than a caller-selected version.'
+      description: "A request for a download URL for the current free datacentre-only database. Takes no parameters: the free tier always serves the latest build rather than a caller-selected version."
     techaro.lol.reputationdb.free.fetch.v1.FetchResponse:
       type: object
       properties:
         lifetime:
           title: Lifetime
           description: How long the client should wait before checking for a newer database build
-          $ref: '#/components/schemas/google.protobuf.Duration'
+          $ref: "#/components/schemas/google.protobuf.Duration"
         version:
           type: string
           title: Version
@@ -370,7 +370,7 @@ components:
         created_at:
           title: Created At
           description: When this free database build was published, so clients can tell how stale it is
-          $ref: '#/components/schemas/google.protobuf.Timestamp'
+          $ref: "#/components/schemas/google.protobuf.Timestamp"
       title: Free Fetch Response
       additionalProperties: false
       description: A time-limited download URL for the current free datacentre-only database build, plus how long the client should wait before checking for a newer one.
@@ -422,11 +422,11 @@ components:
         database_created_at:
           title: Database Created At
           description: When the database snapshot that served this query was built, so clients can tell how stale the results are
-          $ref: '#/components/schemas/google.protobuf.Timestamp'
+          $ref: "#/components/schemas/google.protobuf.Timestamp"
         records:
           type: array
           items:
-            $ref: '#/components/schemas/techaro.lol.reputationdb.v1.Record'
+            $ref: "#/components/schemas/techaro.lol.reputationdb.v1.Record"
           title: Records
           description: One record per IP address that was found in the database; requested addresses with no record are omitted
       title: Query Response
@@ -474,7 +474,7 @@ components:
         sources:
           type: array
           items:
-            $ref: '#/components/schemas/techaro.lol.reputationdb.v1.ListMembership'
+            $ref: "#/components/schemas/techaro.lol.reputationdb.v1.ListMembership"
           title: List Memberships
           description: Detailed list membership metadata so administrators can make informed decisions about the risk for an IP address
       title: Database Record

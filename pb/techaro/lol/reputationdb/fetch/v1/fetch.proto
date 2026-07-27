@@ -12,145 +12,123 @@ service FetchService {
   rpc Fetch(FetchRequest) returns (FetchResponse) {
     option (google.api.http).get = "/api/v1/database/{version_id}/fetch";
     option (google.api.method_visibility).restriction = "PUBLIC";
-  };
+  }
   rpc Info(InfoRequest) returns (InfoResponse) {
     option (google.api.http).get = "/api/v1/database/{version_id}/info";
     option (google.api.method_visibility).restriction = "PUBLIC";
-  };
+  }
   rpc List(ListRequest) returns (ListResponse) {
     option (google.api.http).get = "/api/v1/database";
     option (google.api.method_visibility).restriction = "PUBLIC";
-  };
+  }
 }
 
 message FetchRequest {
-    option (google.api.message_visibility).restriction = "PUBLIC";
+  option (google.api.message_visibility).restriction = "PUBLIC";
   option (gnostic.openapi.v3.schema) = {
-    title: "Fetch Request";
-    description: "A request for a download URL for one published database version.";
+    title: "Fetch Request"
+    description: "A request for a download URL for one published database version."
   };
 
-  string version_id = 1 [
-    (gnostic.openapi.v3.property) = {
-      title: "Version ID";
-      description: "The version ID of the database to download, as returned by the list endpoint";
-    }
-  ];
+  string version_id = 1 [(gnostic.openapi.v3.property) = {
+    title: "Version ID"
+    description: "The version ID of the database to download, as returned by the list endpoint"
+  }];
 }
 
 message DatabaseVersion {
-    option (google.api.message_visibility).restriction = "PUBLIC";
+  option (google.api.message_visibility).restriction = "PUBLIC";
   option (gnostic.openapi.v3.schema) = {
-    title: "Database Version";
-    description: "Metadata about a single published database version, including the data repository commit it was built from.";
+    title: "Database Version"
+    description: "Metadata about a single published database version, including the data repository commit it was built from."
   };
 
-  google.protobuf.Timestamp created_at = 1 [
-    (gnostic.openapi.v3.property) = {
-      title: "Created At";
-      description: "When this version was published, in UTC";
-    }
-  ];
-  string repo_shasum = 2 [
-    (gnostic.openapi.v3.property) = {
-      title: "Repository Commit SHA";
-      description: "The full hex SHA of the data repository commit this database was built from";
-    }
-  ];
-  string repo_commit_message = 3 [
-    (gnostic.openapi.v3.property) = {
-      title: "Repository Commit Message";
-      description: "The commit message of the data repository commit this database was built from";
-    }
-  ];
-  string version_id = 4 [
-    (gnostic.openapi.v3.property) = {
-      title: "Version ID";
-      description: "The identity of the database contents: the unpadded URL-safe base64 encoding of the SHA-512 of the uncompressed database. Republishing identical contents yields the same version ID.";
-    }
-  ];
+  google.protobuf.Timestamp created_at = 1 [(gnostic.openapi.v3.property) = {
+    title: "Created At"
+    description: "When this version was published, in UTC"
+  }];
+  string repo_shasum = 2 [(gnostic.openapi.v3.property) = {
+    title: "Repository Commit SHA"
+    description: "The full hex SHA of the data repository commit this database was built from"
+  }];
+  string repo_commit_message = 3 [(gnostic.openapi.v3.property) = {
+    title: "Repository Commit Message"
+    description: "The commit message of the data repository commit this database was built from"
+  }];
+  string version_id = 4 [(gnostic.openapi.v3.property) = {
+    title: "Version ID"
+    description: "The identity of the database contents: the unpadded URL-safe base64 encoding of the SHA-512 of the uncompressed database. Republishing identical contents yields the same version ID."
+  }];
 }
 
 message FetchResponse {
-    option (google.api.message_visibility).restriction = "PUBLIC";
+  option (google.api.message_visibility).restriction = "PUBLIC";
   option (gnostic.openapi.v3.schema) = {
-    title: "Fetch Response";
-    description: "A time-limited download URL for a database version, plus how long the client should wait before checking for a newer one.";
+    title: "Fetch Response"
+    description: "A time-limited download URL for a database version, plus how long the client should wait before checking for a newer one."
   };
 
   // Metadata about the database version
-  DatabaseVersion version = 1 [
-    (gnostic.openapi.v3.property) = {
-      title: "Version";
-      description: "Metadata about the database version being downloaded";
-    }
-  ];
+  DatabaseVersion version = 1 [(gnostic.openapi.v3.property) = {
+    title: "Version"
+    description: "Metadata about the database version being downloaded"
+  }];
   // Download presigned GET url for the database
-  string presigned_url = 2 [
-    (gnostic.openapi.v3.property) = {
-      title: "Presigned URL";
-      description: "A presigned GET URL for the zstd-compressed database. It expires, so fetch it again rather than caching the URL itself.";
-    }
-  ];
+  string presigned_url = 2 [(gnostic.openapi.v3.property) = {
+    title: "Presigned URL"
+    description: "A presigned GET URL for the zstd-compressed database. It expires, so fetch it again rather than caching the URL itself."
+  }];
   // How long the client should wait before updating
-  google.protobuf.Duration lifetime = 3 [
-    (gnostic.openapi.v3.property) = {
-      title: "Lifetime";
-      description: "How long the client should wait before checking for a newer database version";
-    }
-  ];
+  google.protobuf.Duration lifetime = 3 [(gnostic.openapi.v3.property) = {
+    title: "Lifetime"
+    description: "How long the client should wait before checking for a newer database version"
+  }];
 }
 
 message InfoRequest {
-    option (google.api.message_visibility).restriction = "PUBLIC";
+  option (google.api.message_visibility).restriction = "PUBLIC";
   option (gnostic.openapi.v3.schema) = {
-    title: "Info Request";
-    description: "A request for metadata about one published database version, without a download URL.";
+    title: "Info Request"
+    description: "A request for metadata about one published database version, without a download URL."
   };
 
-  string version_id = 1 [
-    (gnostic.openapi.v3.property) = {
-      title: "Version ID";
-      description: "The version ID of the database to describe, as returned by the list endpoint";
-    }
-  ];
+  string version_id = 1 [(gnostic.openapi.v3.property) = {
+    title: "Version ID"
+    description: "The version ID of the database to describe, as returned by the list endpoint"
+  }];
 }
 
 message InfoResponse {
-    option (google.api.message_visibility).restriction = "PUBLIC";
+  option (google.api.message_visibility).restriction = "PUBLIC";
   option (gnostic.openapi.v3.schema) = {
-    title: "Info Response";
-    description: "Metadata about one published database version.";
+    title: "Info Response"
+    description: "Metadata about one published database version."
   };
 
   // Metadata about the database version
-  DatabaseVersion version = 1 [
-    (gnostic.openapi.v3.property) = {
-      title: "Version";
-      description: "Metadata about the requested database version";
-    }
-  ];
+  DatabaseVersion version = 1 [(gnostic.openapi.v3.property) = {
+    title: "Version"
+    description: "Metadata about the requested database version"
+  }];
 }
 
 message ListRequest {
-    option (google.api.message_visibility).restriction = "PUBLIC";
+  option (google.api.message_visibility).restriction = "PUBLIC";
   option (gnostic.openapi.v3.schema) = {
-    title: "List Request";
-    description: "A request for every database version the server currently retains. Takes no parameters.";
+    title: "List Request"
+    description: "A request for every database version the server currently retains. Takes no parameters."
   };
 }
 
 message ListResponse {
-    option (google.api.message_visibility).restriction = "PUBLIC";
+  option (google.api.message_visibility).restriction = "PUBLIC";
   option (gnostic.openapi.v3.schema) = {
-    title: "List Response";
-    description: "Every database version the server currently retains.";
+    title: "List Response"
+    description: "Every database version the server currently retains."
   };
 
-  repeated DatabaseVersion versions = 1 [
-    (gnostic.openapi.v3.property) = {
-      title: "Versions";
-      description: "The retained database versions, ordered newest first and capped at the ten most recent";
-    }
-  ];
+  repeated DatabaseVersion versions = 1 [(gnostic.openapi.v3.property) = {
+    title: "Versions"
+    description: "The retained database versions, ordered newest first and capped at the ten most recent"
+  }];
 }
