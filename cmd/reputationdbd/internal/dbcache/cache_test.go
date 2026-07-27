@@ -139,9 +139,7 @@ func TestCacheRefresh(t *testing.T) {
 	dir := t.TempDir()
 	c := newCache(t, src, dir)
 
-	if err := c.Refresh(t.Context()); err != nil {
-		t.Fatalf("Refresh() error = %v", err)
-	}
+	waitReady(t, c)
 	if !has(t, c, "1.2.3.4") {
 		t.Fatal("1.2.3.4 missing from the freshly loaded database")
 	}
@@ -220,9 +218,7 @@ func TestCacheReusesTheCachedFile(t *testing.T) {
 	dir := t.TempDir()
 
 	first := newCache(t, src, dir)
-	if err := first.Refresh(t.Context()); err != nil {
-		t.Fatalf("Refresh() (first) error = %v", err)
-	}
+	waitReady(t, first)
 	cached := first.Path()
 	if err := first.Close(); err != nil {
 		t.Fatalf("Close() (first) error = %v", err)
@@ -232,9 +228,7 @@ func TestCacheReusesTheCachedFile(t *testing.T) {
 	}
 
 	second := newCache(t, src, dir)
-	if err := second.Refresh(t.Context()); err != nil {
-		t.Fatalf("Refresh() (second) error = %v", err)
-	}
+	waitReady(t, second)
 
 	if got := src.Opens(); got != 1 {
 		t.Errorf("downloads = %d, want 1: the cached file should have been reused", got)
@@ -259,9 +253,7 @@ func TestCacheFallsBackToTheMmdbBuildTime(t *testing.T) {
 	src.Publish("v1", time.Time{}, compressed)
 
 	c := newCache(t, src, t.TempDir())
-	if err := c.Refresh(t.Context()); err != nil {
-		t.Fatalf("Refresh() error = %v", err)
-	}
+	waitReady(t, c)
 
 	_, createdAt, loaded, err := c.Query([]netip.Addr{mustAddr(t, "1.2.3.4")})
 	if err != nil || !loaded {
@@ -382,5 +374,56 @@ func TestCacheKeepsServingAfterAFailedRefresh(t *testing.T) {
 	}
 	if !has(t, c, "1.2.3.4") {
 		t.Error("1.2.3.4 missing after a failed refresh: the working database was dropped")
+	}
+}
+
+// waitReady blocks until the cache has loaded a database. Loading happens in
+// the background, so anything asserting on a loaded database has to wait first.
+func waitReady(t *testing.T, c *dbcache.Cache) {
+	t.Helper()
+
+	select {
+	case <-c.Ready():
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for the database to load")
+	}
+}
+
+// Nobody calls Refresh in production; the loop does. This is the test that the
+// loop exists at all.
+func TestCacheLoadsInTheBackground(t *testing.T) {
+	src := dbcachetest.New()
+	publish(t, src, "v1", "1.2.3.4/32")
+
+	c := newCache(t, src, t.TempDir())
+	waitReady(t, c)
+
+	if !has(t, c, "1.2.3.4") {
+		t.Error("1.2.3.4 missing from the database the loop loaded")
+	}
+}
+
+func TestCacheCloseStopsTheLoop(t *testing.T) {
+	src := dbcachetest.New()
+	publish(t, src, "v1", "1.2.3.4/32")
+
+	c, err := dbcache.New(t.Context(), discardLogger(), src, t.TempDir())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	waitReady(t, c)
+
+	// Close returns only once the loop has stopped, so a Close that returns at
+	// all is the assertion here; the deadline catches a loop that never exits.
+	done := make(chan error, 1)
+	go func() { done <- c.Close() }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close() did not return: the refresh loop is still running")
 	}
 }

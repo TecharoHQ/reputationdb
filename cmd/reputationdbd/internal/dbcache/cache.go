@@ -25,6 +25,20 @@ const (
 	maxDatabaseSize = 4 << 30
 )
 
+const (
+	// refreshInterval is how long to wait between checks for a newer build.
+	// The database is rebuilt daily, so this is far more often than it needs
+	// to be; a check reads one small gzipped index object, and picking up a new
+	// build promptly is worth more than the round trips cost.
+	refreshInterval = 15 * time.Minute
+	// retryInterval is how long to wait after a failed refresh.
+	retryInterval = time.Minute
+
+	// fetchTimeout bounds a single refresh: the index read plus the download.
+	// The full database is on the order of 800 MiB, so this is generous.
+	fetchTimeout = 30 * time.Minute
+)
+
 // Match is one address that was found in the database.
 type Match struct {
 	// Addr is the address that was looked up.
@@ -87,7 +101,7 @@ func New(ctx context.Context, lg *slog.Logger, src Source, dir string) (*Cache, 
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	return &Cache{
+	c := &Cache{
 		src:    src,
 		dir:    dir,
 		lg:     lg.With("component", "dbcache"),
@@ -95,7 +109,11 @@ func New(ctx context.Context, lg *slog.Logger, src Source, dir string) (*Cache, 
 		cancel: cancel,
 		done:   make(chan struct{}),
 		ready:  make(chan struct{}),
-	}, nil
+	}
+
+	go c.run()
+
+	return c, nil
 }
 
 // Ready returns a channel that is closed once a database has been loaded for
@@ -153,12 +171,13 @@ func (c *Cache) databasePath(version string) string {
 	return filepath.Join(c.dir, fmt.Sprintf("reputationdb-%s.mmdb", base64.RawURLEncoding.EncodeToString(sum[:16])))
 }
 
-// Close releases the mapping.
+// Close stops the refresh goroutine and releases the mapping.
 //
 // The database file is deliberately left on disk: it is the cache that lets the
 // next start skip the download.
 func (c *Cache) Close() error {
 	c.cancel()
+	<-c.done
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -332,5 +351,47 @@ func (c *Cache) release(db *reputationdb.DB, path, keep string) {
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		c.lg.Warn("can't remove the retired database", "path", path, "err", err)
+	}
+}
+
+// loaded reports whether a database is currently mapped.
+func (c *Cache) loaded() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.db != nil
+}
+
+// run loads the database and then keeps it fresh until the cache is closed. The
+// first attempt happens immediately, which is what makes the database show up
+// shortly after the server starts rather than before it.
+func (c *Cache) run() {
+	defer close(c.done)
+
+	for {
+		delay := refreshInterval
+
+		ctx, cancel := context.WithTimeout(c.ctx, fetchTimeout)
+		err := c.Refresh(ctx)
+		cancel()
+
+		if err != nil {
+			// Retry sooner than the normal cadence either way, but say which
+			// situation this is: with a database already mapped this is a
+			// stale-data warning, and without one it means queries are failing.
+			if c.loaded() {
+				c.lg.Error("can't refresh the reputation database, continuing with the one already loaded",
+					"retry_in", retryInterval, "err", err)
+			} else {
+				c.lg.Error("can't load the reputation database, queries will fail until this succeeds",
+					"retry_in", retryInterval, "err", err)
+			}
+			delay = retryInterval
+		}
+
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-time.After(delay):
+		}
 	}
 }
