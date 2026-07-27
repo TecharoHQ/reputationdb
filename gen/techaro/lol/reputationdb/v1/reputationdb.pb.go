@@ -295,10 +295,10 @@ var File_techaro_lol_reputationdb_v1_reputationdb_proto protoreflect.FileDescrip
 
 const file_techaro_lol_reputationdb_v1_reputationdb_proto_rawDesc = "" +
 	"\n" +
-	".techaro/lol/reputationdb/v1/reputationdb.proto\x12\x1btecharo.lol.reputationdb.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaa\x03\n" +
+	".techaro/lol/reputationdb/v1/reputationdb.proto\x12\x1btecharo.lol.reputationdb.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe4\x03\n" +
 	"\fQueryRequest\x12\xd6\x01\n" +
 	"\fip_addresses\x18\x01 \x03(\tB\xb2\x01\xbaGTJ\fIP addressesY\x00\x00\x00\x00\x00\x00Y@i\x00\x00\x00\x00\x00\x00\xf0?\x92\x021IP addresses in string format without CIDR prefix\xbaHX\xc8\x01\x01\x92\x01R\b\x01\x10d\"L\xba\x01I\n" +
-	"\x18ip_address.is_ip_address\x12 ip_address must be an IP address\x1a\vthis.isIp()R\vipAddresses:\xc0\x01\xbaG\xae\x01J\rQuery Request\x92\x02\x9b\x01A batch of IP addresses to look up in the reputation database. Addresses that have no record are omitted from the response instead of being returned empty.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xdd\x05\n" +
+	"\x18ip_address.is_ip_address\x12 ip_address must be an IP address\x1a\vthis.isIp()R\vipAddresses:\xfa\x01\xbaG\xe8\x01J\rQuery Request\x92\x02\xd5\x01A batch of IP addresses to look up in the reputation database. Every address gets a record back, in the order it was asked about; an address the database has nothing on comes back carrying only its own ip_address.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xdd\x05\n" +
 	"\x0eListMembership\x12\xa9\x01\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tB\x88\x01\xbaG\x84\x01J\n" +
@@ -306,7 +306,8 @@ const file_techaro_lol_reputationdb_v1_reputationdb_proto_rawDesc = "" +
 	"repository\x12V\n" +
 	"\x04list\x18\x02 \x01(\tBB\xbaG?J\x04List\x92\x026The name of the exact list the IP address was found inR\x04list\x12\x9b\x01\n" +
 	"\bprovider\x18\x03 \x01(\tB\x7f\xbaG|J\bProvider\x92\x02oThe provider or source of this IP address, such as the organization for a manual report or the hosting providerR\bprovider\x12p\n" +
-	"\bcategory\x18\x04 \x01(\tBT\xbaGQJ\bCategory\x92\x02DThe main category of this IP address such as abuse, vpn, proxy, etc.R\bcategory:\xb6\x01\xbaG\xa4\x01J\x0fList Membership\x92\x02\x8f\x01The reason an IP address was added into the database such as the repository it was imported from or the manual report made by an administrator.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xe0\b\n" +
+	"\bcategory\x18\x04 \x01(\tBT\xbaGQJ\bCategory\x92\x02DThe main category of this IP address such as abuse, vpn, proxy, etc.R\bcategory:\xb6\x01\xbaG\xa4\x01J\x0fList Membership\x92\x02\x8f\x01The reason an IP address was added into the database such as the repository it was imported from or the manual report made by an administrator.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\x9d\n" +
+	"\n" +
 	"\x06Record\x12n\n" +
 	"\n" +
 	"ip_address\x18\x01 \x01(\tBO\xbaGLJ\n" +
@@ -322,10 +323,10 @@ const file_techaro_lol_reputationdb_v1_reputationdb_proto_rawDesc = "" +
 	"Categories\x92\x02BAll of the categories in every list membership for this IP addressR\n" +
 	"categories\x12c\n" +
 	"\tproviders\x18\a \x03(\tBE\xbaGBJ\x10Report Providers\x92\x02-All of the list providers for this IP addressR\tproviders\x12\xd1\x01\n" +
-	"\asources\x18\b \x03(\v2+.techaro.lol.reputationdb.v1.ListMembershipB\x89\x01\xbaG\x85\x01J\x10List Memberships\x92\x02pDetailed list membership metadata so administrators can make informed decisions about the risk for an IP addressR\asources:\x8c\x01\xbaG{J\x0fDatabase Record\x92\x02gThe database record for an IP address including the categories, providers, and list membership metadata\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xc0\x04\n" +
+	"\asources\x18\b \x03(\v2+.techaro.lol.reputationdb.v1.ListMembershipB\x89\x01\xbaG\x85\x01J\x10List Memberships\x92\x02pDetailed list membership metadata so administrators can make informed decisions about the risk for an IP addressR\asources:\xc9\x02\xbaG\xb7\x02J\x0fDatabase Record\x92\x02\xa2\x02The database record for an IP address including the categories, providers, and list membership metadata. An address the database has nothing on still gets a record, carrying only its ip_address with no categories, providers, or sources — that empty record is what 'not listed' looks like.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xdd\x05\n" +
 	"\rQueryResponse\x12\xd3\x01\n" +
-	"\x13database_created_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x86\x01\xbaG\x82\x01J\x13Database Created At\x92\x02jWhen the database snapshot that served this query was built, so clients can tell how stale the results areR\x11databaseCreatedAt\x12\xb6\x01\n" +
-	"\arecords\x18\x02 \x03(\v2#.techaro.lol.reputationdb.v1.RecordBw\xbaGtJ\aRecords\x92\x02hOne record per IP address that was found in the database; requested addresses with no record are omittedR\arecords:\x9f\x01\xbaG\x8d\x01J\x0eQuery Response\x92\x02zThe database records matching the requested IP addresses, along with the age of the database snapshot they were read from.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC2\x9c\x01\n" +
+	"\x13database_created_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x86\x01\xbaG\x82\x01J\x13Database Created At\x92\x02jWhen the database snapshot that served this query was built, so clients can tell how stale the results areR\x11databaseCreatedAt\x12\xd9\x02\n" +
+	"\arecords\x18\x02 \x03(\v2#.techaro.lol.reputationdb.v1.RecordB\x99\x02\xbaG\x95\x02J\aRecords\x92\x02\x88\x02One record per requested IP address, in the order they were asked about, so responses line up against the request one for one. Duplicate spellings of the same address collapse to a single record. An address with nothing in the database carries only its ip_address.R\arecords:\x99\x01\xbaG\x87\x01J\x0eQuery Response\x92\x02tOne database record for every requested IP address, along with the age of the database snapshot they were read from.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC2\x9c\x01\n" +
 	"\x11ReputationService\x12\x86\x01\n" +
 	"\x05Query\x12).techaro.lol.reputationdb.v1.QueryRequest\x1a*.techaro.lol.reputationdb.v1.QueryResponse\"&\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/api/v1/queryB\x95\x02\n" +
 	"\x1fcom.techaro.lol.reputationdb.v1B\x11ReputationdbProtoP\x01ZPgithub.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/v1;reputationdbv1\xa2\x02\x03TLR\xaa\x02\x1bTecharo.Lol.Reputationdb.V1\xca\x02\x1bTecharo\\Lol\\Reputationdb\\V1\xe2\x02'Techaro\\Lol\\Reputationdb\\V1\\GPBMetadata\xea\x02\x1eTecharo::Lol::Reputationdb::V1b\x06proto3"

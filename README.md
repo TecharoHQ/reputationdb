@@ -35,29 +35,32 @@ curl -s localhost:3823/api/v1/query \
           "category": "datacenter"
         }
       ]
+    },
+    {
+      "ipAddress": "2001:db8::1"
     }
   ]
 }
 ```
 
-Addresses with no record are **omitted** from `records` rather than returned
-empty, so the presence of a record is the signal. Each `ipAddress` echoes the
-string you sent, so you can match records back to your request; duplicate
-spellings of one address collapse to a single record. `databaseCreatedAt` is
-when the database snapshot serving the query was published, so you can tell how
-stale the answer is.
+You get **one record per address you asked about, in the order you asked**, so
+you can line the response up against your request without matching on anything.
+Each `ipAddress` echoes the string you sent, and duplicate spellings of the same
+address collapse to a single record. `databaseCreatedAt` is when the database
+snapshot serving the query was published, so you can tell how stale the answer
+is.
 
-Two shape details worth knowing before you parse this, both verified against a
-running server:
+The second record above is what an address the database has nothing on looks
+like: its `ipAddress` and nothing else. **The presence of a record tells you
+nothing** — an empty `sources` (equivalently, an empty `categories`) is the
+signal that an address is not listed.
 
-- **Fields that are absent are false or empty.** A record for an address that
-  is only a datacentre address carries `isDatacenter` and no `isVpn`,
-  `isCrawler`, or `isProxy` key at all — not `"isVpn": false`.
-- **`records` disappears entirely when nothing matches.** A query where none of
-  the addresses are listed returns just
-  `{"databaseCreatedAt": "..."}` — no `records` key, not `"records": []`. Code
-  that reaches straight for `response.records.length` will trip over this;
-  treat a missing `records` as an empty list.
+One shape detail worth knowing before you parse this, verified against a running
+server: **fields that are absent are false or empty.** A record for an address
+that is only a datacentre address carries `isDatacenter` and no `isVpn`,
+`isCrawler`, or `isProxy` key at all — not `"isVpn": false`. Likewise an
+unlisted address carries no `categories`, `providers`, or `sources` keys rather
+than empty arrays, so read a missing key as "empty" throughout.
 
 The server keeps its own copy of the newest published database and swaps in a
 newer one when it appears. On a cold start that copy takes a few minutes to

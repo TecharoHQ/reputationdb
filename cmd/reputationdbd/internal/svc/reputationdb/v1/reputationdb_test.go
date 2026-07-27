@@ -248,7 +248,9 @@ func TestQueryReturnsRecordsForListedAddresses(t *testing.T) {
 
 // Addresses with no record are omitted rather than returned empty, so a client
 // can treat the presence of a record as the signal.
-func TestQueryOmitsAddressesWithNoRecord(t *testing.T) {
+// An address the database has nothing on still gets a record, so a client can
+// line the response up against its request one for one.
+func TestQueryReturnsAnEmptyRecordForAnAddressWithNothingOnIt(t *testing.T) {
 	s := loadedServer(t, "1.2.3.4/32")
 	waitLoaded(t, s)
 
@@ -260,11 +262,59 @@ func TestQueryOmitsAddressesWithNoRecord(t *testing.T) {
 	}
 
 	records := resp.Msg.GetRecords()
-	if len(records) != 1 {
-		t.Fatalf("Query() returned %d records, want 1: 9.9.9.9 is not in the database", len(records))
+	if len(records) != 2 {
+		t.Fatalf("Query() returned %d records, want 2: one per requested address", len(records))
 	}
-	if records[0].GetIpAddress() != "1.2.3.4" {
-		t.Errorf("Query() returned a record for %q, want 1.2.3.4", records[0].GetIpAddress())
+
+	// Order follows the request, not the database.
+	if got := records[0].GetIpAddress(); got != "1.2.3.4" {
+		t.Errorf("Query() records[0] = %q, want 1.2.3.4", got)
+	}
+	if got := records[1].GetIpAddress(); got != "9.9.9.9" {
+		t.Errorf("Query() records[1] = %q, want 9.9.9.9", got)
+	}
+
+	// The hit carries data; the miss carries nothing but its address. An empty
+	// sources list is what "not listed" looks like now that every address gets
+	// a record.
+	if len(records[0].GetSources()) == 0 {
+		t.Error("Query() records[0] has no sources, want the datacentre membership for 1.2.3.4")
+	}
+	if got := records[1].GetSources(); len(got) != 0 {
+		t.Errorf("Query() records[1] sources = %v, want empty for an address with nothing on it", got)
+	}
+	if got := records[1].GetCategories(); len(got) != 0 {
+		t.Errorf("Query() records[1] categories = %v, want empty", got)
+	}
+	if got := records[1].GetProviders(); len(got) != 0 {
+		t.Errorf("Query() records[1] providers = %v, want empty", got)
+	}
+	if records[1].GetIsVpn() || records[1].GetIsDatacenter() || records[1].GetIsCrawler() || records[1].GetIsProxy() {
+		t.Error("Query() records[1] has a category flag set, want all false for an address with nothing on it")
+	}
+}
+
+// Every address misses, which is the case that used to return no records at
+// all. The response must still carry one record each.
+func TestQueryReturnsRecordsWhenNothingIsListed(t *testing.T) {
+	s := loadedServer(t, "1.2.3.4/32")
+	waitLoaded(t, s)
+
+	resp, err := s.Query(context.Background(), connect.NewRequest(&reputationdbv1.QueryRequest{
+		IpAddresses: []string{"9.9.9.9", "8.8.4.4"},
+	}))
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+
+	records := resp.Msg.GetRecords()
+	if len(records) != 2 {
+		t.Fatalf("Query() returned %d records, want 2 even though neither address is listed", len(records))
+	}
+	for i, want := range []string{"9.9.9.9", "8.8.4.4"} {
+		if got := records[i].GetIpAddress(); got != want {
+			t.Errorf("Query() records[%d] = %q, want %q", i, got, want)
+		}
 	}
 }
 

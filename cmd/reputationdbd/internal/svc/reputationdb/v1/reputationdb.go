@@ -135,8 +135,11 @@ func newServer(cache *dbcache.Cache, lg *slog.Logger) *Server {
 
 // Query looks a batch of addresses up in the database.
 //
-// Addresses with no record are omitted from the response rather than returned
-// empty, so a client can treat the presence of a record as the signal.
+// Every requested address gets a record, in the order it was asked about. An
+// address the database has nothing on comes back carrying only its own
+// ip_address, so a client can line responses up against its request one for
+// one. That means the presence of a record says nothing: an empty categories
+// and sources list is what "not listed" looks like.
 func (s *Server) Query(ctx context.Context, req *connect.Request[reputationdbv1.QueryRequest]) (*connect.Response[reputationdbv1.QueryResponse], error) {
 	raw := req.Msg.GetIpAddresses()
 	if len(raw) == 0 {
@@ -165,9 +168,19 @@ func (s *Server) Query(ctx context.Context, req *connect.Request[reputationdbv1.
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	records := make([]*reputationdbv1.Record, 0, len(matches))
+	// Index the hits so the response can be built by walking the requested
+	// addresses instead of the matches: that keeps the records in the order
+	// the client asked, and gives an address the database has nothing on a
+	// zero Result, which toRecord renders as a record carrying only its
+	// ip_address.
+	hits := make(map[netip.Addr]reputationdb.Result, len(matches))
 	for _, m := range matches {
-		records = append(records, toRecord(inputs[m.Addr], m.Result))
+		hits[m.Addr] = m.Result
+	}
+
+	records := make([]*reputationdbv1.Record, 0, len(addrs))
+	for _, addr := range addrs {
+		records = append(records, toRecord(inputs[addr], hits[addr]))
 	}
 
 	return connect.NewResponse(&reputationdbv1.QueryResponse{

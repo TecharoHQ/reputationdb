@@ -417,7 +417,7 @@ components:
       required:
         - ip_addresses
       additionalProperties: false
-      description: A batch of IP addresses to look up in the reputation database. Addresses that have no record are omitted from the response instead of being returned empty.
+      description: A batch of IP addresses to look up in the reputation database. Every address gets a record back, in the order it was asked about; an address the database has nothing on comes back carrying only its own ip_address.
     techaro.lol.reputationdb.v1.QueryResponse:
       type: object
       properties:
@@ -430,10 +430,10 @@ components:
           items:
             $ref: "#/components/schemas/techaro.lol.reputationdb.v1.Record"
           title: Records
-          description: One record per IP address that was found in the database; requested addresses with no record are omitted
+          description: One record per requested IP address, in the order they were asked about, so responses line up against the request one for one. Duplicate spellings of the same address collapse to a single record. An address with nothing in the database carries only its ip_address.
       title: Query Response
       additionalProperties: false
-      description: The database records matching the requested IP addresses, along with the age of the database snapshot they were read from.
+      description: One database record for every requested IP address, along with the age of the database snapshot they were read from.
     techaro.lol.reputationdb.v1.Record:
       type: object
       properties:
@@ -481,7 +481,7 @@ components:
           description: Detailed list membership metadata so administrators can make informed decisions about the risk for an IP address
       title: Database Record
       additionalProperties: false
-      description: The database record for an IP address including the categories, providers, and list membership metadata
+      description: The database record for an IP address including the categories, providers, and list membership metadata. An address the database has nothing on still gets a record, carrying only its ip_address with no categories, providers, or sources — that empty record is what 'not listed' looks like.
   securitySchemes:
     APIKey:
       type: http
