@@ -241,6 +241,41 @@ func TestCacheReusesTheCachedFile(t *testing.T) {
 	}
 }
 
+// A restart that lands on a new build must not leave the previous run's file
+// behind: old is nil on a process's first load, so release alone never sweeps
+// it, and nothing else in the package reads the cache directory.
+func TestCacheSweepsStaleDatabaseFilesOnLoad(t *testing.T) {
+	src := dbcachetest.New()
+	publish(t, src, "v1", "1.2.3.4/32")
+
+	dir := t.TempDir()
+
+	stale := filepath.Join(dir, "reputationdb-stale.mmdb")
+	if err := os.WriteFile(stale, []byte("a previous run's build"), 0o600); err != nil {
+		t.Fatalf("seeding %s: %v", stale, err)
+	}
+	// A file this package didn't create must survive the sweep: an operator
+	// may have mounted a shared volume, and a stray "reputationdb-*.mmdb"
+	// match is the only thing sweep is allowed to touch.
+	unrelated := filepath.Join(dir, "sentinel")
+	if err := os.WriteFile(unrelated, nil, 0o600); err != nil {
+		t.Fatalf("seeding %s: %v", unrelated, err)
+	}
+
+	c := newCache(t, src, dir)
+	waitReady(t, c)
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the stale database %s is still on disk (stat err %v), want it swept", stale, err)
+	}
+	if _, err := os.Stat(unrelated); err != nil {
+		t.Errorf("the unrelated file %s was removed by the sweep: %v", unrelated, err)
+	}
+	if _, err := os.Stat(c.Path()); err != nil {
+		t.Errorf("the newly loaded database %s is missing from disk: %v", c.Path(), err)
+	}
+}
+
 // An index entry with no created_at falls back to the build epoch baked into
 // the mmdb, so a response always carries some idea of how stale it is.
 func TestCacheFallsBackToTheMmdbBuildTime(t *testing.T) {

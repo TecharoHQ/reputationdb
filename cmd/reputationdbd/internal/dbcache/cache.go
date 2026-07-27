@@ -328,6 +328,14 @@ func (c *Cache) load(path string, b Build, cached bool) error {
 	// Closing it now releases the mapping instead of leaking it.
 	c.release(old, oldPath, path)
 
+	// release only ever retires the file this process had mapped, which is
+	// nothing on a process's first load. Sweeping the whole directory here
+	// instead catches whatever an earlier process left behind too, which is
+	// the case that actually matters: the cache directory is meant to survive
+	// restarts, and a restart that lands on a new build is exactly when a
+	// previous run's ~800 MiB file would otherwise sit there forever.
+	c.sweep(path)
+
 	c.readyOnce.Do(func() { close(c.ready) })
 
 	c.lg.Info("loaded the reputation database",
@@ -355,6 +363,35 @@ func (c *Cache) release(db *reputationdb.DB, path, keep string) {
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		c.lg.Warn("can't remove the retired database", "path", path, "err", err)
+	}
+}
+
+// sweep removes every database file this package owns other than keep.
+//
+// The glob only matches complete databases (reputationdb-<hash>.mmdb), never
+// the reputationdb-*.mmdb.tmp staging files download creates: a name ending
+// in .mmdb.tmp does not satisfy a pattern that requires the string to end in
+// .mmdb, so a download in progress is never touched. Anything else in the
+// directory — an operator's own files on a shared volume, this package's own
+// sentinel files in tests — is left alone because it doesn't match the glob
+// at all.
+//
+// Failures are logged and swallowed rather than returned: a database that
+// just loaded successfully must keep serving even if cleanup is denied by
+// permissions, and a restart will get another chance to sweep.
+func (c *Cache) sweep(keep string) {
+	matches, err := filepath.Glob(filepath.Join(c.dir, "reputationdb-*.mmdb"))
+	if err != nil {
+		c.lg.Warn("can't list stale databases to sweep", "dir", c.dir, "err", err)
+		return
+	}
+	for _, path := range matches {
+		if path == keep {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			c.lg.Warn("can't remove a stale database", "path", path, "err", err)
+		}
 	}
 }
 
