@@ -1,6 +1,7 @@
 package dbcache_test
 
 import (
+	"errors"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/dbcache"
 	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal/dbcache/dbcachetest"
+	"github.com/klauspost/compress/zstd"
 )
 
 func mustAddr(t *testing.T, s string) netip.Addr {
@@ -267,5 +269,107 @@ func TestCacheFallsBackToTheMmdbBuildTime(t *testing.T) {
 	}
 	if createdAt.IsZero() {
 		t.Error("Query() created_at is the zero time, want the mmdb's build epoch")
+	}
+}
+
+// countCacheFiles returns how many files of any kind — finished databases and
+// partial .tmp ones alike — are sitting in dir.
+func countCacheFiles(t *testing.T, dir string) int {
+	t.Helper()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir(%s): %v", dir, err)
+	}
+	return len(entries)
+}
+
+func TestCacheRefreshFailures(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		setup func(t *testing.T, src *dbcachetest.Fake)
+	}{
+		{
+			name:  "nothing has been published",
+			setup: func(t *testing.T, src *dbcachetest.Fake) {},
+		},
+		{
+			name: "the index can't be read",
+			setup: func(t *testing.T, src *dbcachetest.Fake) {
+				publish(t, src, "v1", "1.2.3.4/32")
+				src.SetCurrentErr(errors.New("network is on fire"))
+			},
+		},
+		{
+			name: "the object can't be read",
+			setup: func(t *testing.T, src *dbcachetest.Fake) {
+				publish(t, src, "v1", "1.2.3.4/32")
+				src.SetOpenErr(errors.New("no credentials"))
+			},
+		},
+		{
+			name: "the object is not zstd",
+			setup: func(t *testing.T, src *dbcachetest.Fake) {
+				src.Publish("v1", publishedAt, []byte("this is not a database"))
+			},
+		},
+		{
+			name: "the object is zstd but not an mmdb",
+			setup: func(t *testing.T, src *dbcachetest.Fake) {
+				enc, err := zstd.NewWriter(nil)
+				if err != nil {
+					t.Fatalf("zstd.NewWriter: %v", err)
+				}
+				defer enc.Close()
+				src.Publish("v1", publishedAt, enc.EncodeAll([]byte("not an mmdb"), nil))
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			src := dbcachetest.New()
+			tt.setup(t, src)
+
+			dir := t.TempDir()
+			c := newCache(t, src, dir)
+
+			if err := c.Refresh(t.Context()); err == nil {
+				t.Fatal("Refresh() error = nil, want a failure")
+			}
+
+			// Nothing may be mapped, and no partial file may survive for a
+			// later run to mistake for a cached database.
+			if _, _, loaded, _ := c.Query(nil); loaded {
+				t.Error("Query() loaded = true after a failed refresh, want false")
+			}
+			if got := countCacheFiles(t, dir); got != 0 {
+				t.Errorf("the cache directory holds %d files after a failed refresh, want 0", got)
+			}
+		})
+	}
+}
+
+// A refresh that fails while a database is already mapped must keep serving the
+// one it has rather than dropping it.
+func TestCacheKeepsServingAfterAFailedRefresh(t *testing.T) {
+	src := dbcachetest.New()
+	publish(t, src, "v1", "1.2.3.4/32")
+
+	c := newCache(t, src, t.TempDir())
+	if err := c.Refresh(t.Context()); err != nil {
+		t.Fatalf("Refresh() error = %v", err)
+	}
+	loadedPath := c.Path()
+
+	publish(t, src, "v2", "5.6.7.8/32")
+	src.SetOpenErr(errors.New("no credentials"))
+
+	if err := c.Refresh(t.Context()); err == nil {
+		t.Fatal("Refresh() error = nil, want a failure")
+	}
+	if got := c.Path(); got != loadedPath {
+		t.Errorf("Path() = %s after a failed refresh, want the previously loaded %s", got, loadedPath)
+	}
+	if !has(t, c, "1.2.3.4") {
+		t.Error("1.2.3.4 missing after a failed refresh: the working database was dropped")
 	}
 }

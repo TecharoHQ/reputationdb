@@ -213,7 +213,15 @@ func (c *Cache) Refresh(ctx context.Context) error {
 	if err := c.download(ctx, b, path); err != nil {
 		return err
 	}
-	return c.load(path, b, false)
+	if err := c.load(path, b, false); err != nil {
+		// The bytes are on disk but unusable. Remove them rather than leave a
+		// file the next start would try to map as a cached database.
+		if rmErr := os.Remove(path); rmErr != nil && !errors.Is(rmErr, fs.ErrNotExist) {
+			c.lg.WarnContext(ctx, "can't remove the unusable database", "path", path, "err", rmErr)
+		}
+		return err
+	}
+	return nil
 }
 
 // download copies the database at b.Key out of the source and decompresses it
