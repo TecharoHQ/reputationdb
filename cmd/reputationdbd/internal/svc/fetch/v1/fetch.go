@@ -19,25 +19,11 @@ import (
 	simplestorage "github.com/tigrisdata/storage-go/simplestorage"
 )
 
-const (
-	// presignExpiry is how long a download URL stays usable. Long enough to
-	// download a few hundred megabytes on a bad connection, short enough that a
-	// leaked URL is not a permanent hole in a paid product.
-	//
-	//lint:ignore U1000 consumed by FetchService.Fetch, added in Task 8
-	presignExpiry = time.Hour
-	// clientLifetime is how long a client should wait before asking for a newer
-	// version. It matches the free tier, and comfortably outlasts the daily
-	// build in .github/workflows/build-database.yml.
-	//
-	//lint:ignore U1000 consumed by FetchService.Info, added in Task 7
-	clientLifetime = 6 * time.Hour
-	// indexCacheTTL is how long a fetched version index is served from memory.
-	// The index changes at most once a day, so reading it from the bucket on
-	// every request would be a round trip per API call for data that is almost
-	// never different.
-	indexCacheTTL = time.Minute
-)
+// indexCacheTTL is how long a fetched version index is served from memory.
+// The index changes at most once a day, so reading it from the bucket on
+// every request would be a round trip per API call for data that is almost
+// never different.
+const indexCacheTTL = time.Minute
 
 // Server implements fetchv1connect.FetchServiceHandler.
 type Server struct {
