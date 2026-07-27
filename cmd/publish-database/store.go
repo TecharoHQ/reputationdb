@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
+	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	simplestorage "github.com/tigrisdata/storage-go/simplestorage"
 )
 
@@ -40,13 +41,13 @@ func (readSeekNopCloser) Close() error { return nil }
 // treating the latter as the former would silently discard every recorded
 // version.
 func indexExists(ctx context.Context, store objectStore) (bool, error) {
-	for obj, err := range store.List(ctx, simplestorage.WithPrefix(indexKey)) {
+	for obj, err := range store.List(ctx, simplestorage.WithPrefix(dbstore.IndexKey)) {
 		if err != nil {
-			return false, fmt.Errorf("listing %s: %w", indexKey, err)
+			return false, fmt.Errorf("listing %s: %w", dbstore.IndexKey, err)
 		}
 		// The prefix is a server-side optimization only; a fake store cannot
 		// honor it (ListOption writes to an unexported struct), so match exactly.
-		if obj.Key == indexKey {
+		if obj.Key == dbstore.IndexKey {
 			return true, nil
 		}
 	}
@@ -61,24 +62,24 @@ func loadIndex(ctx context.Context, store objectStore, lg *slog.Logger) (*fetchv
 		return nil, err
 	}
 	if !exists {
-		lg.Info("no version index found; starting a new one", "key", indexKey)
+		lg.Info("no version index found; starting a new one", "key", dbstore.IndexKey)
 		return &fetchv1.ListResponse{}, nil
 	}
 
-	obj, err := store.Get(ctx, indexKey)
+	obj, err := store.Get(ctx, dbstore.IndexKey)
 	if err != nil {
-		return nil, fmt.Errorf("getting %s: %w", indexKey, err)
+		return nil, fmt.Errorf("getting %s: %w", dbstore.IndexKey, err)
 	}
 	defer obj.Body.Close()
 
 	gzipped, err := io.ReadAll(obj.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", indexKey, err)
+		return nil, fmt.Errorf("reading %s: %w", dbstore.IndexKey, err)
 	}
 
 	idx, err := decodeIndex(gzipped)
 	if err != nil {
-		return nil, fmt.Errorf("decoding %s: %w", indexKey, err)
+		return nil, fmt.Errorf("decoding %s: %w", dbstore.IndexKey, err)
 	}
 
 	return idx, nil
@@ -92,12 +93,12 @@ func saveIndex(ctx context.Context, store objectStore, idx *fetchv1.ListResponse
 	}
 
 	if _, err := store.Put(ctx, &simplestorage.Object{
-		Key:         indexKey,
+		Key:         dbstore.IndexKey,
 		ContentType: "application/octet-stream",
 		Size:        int64(len(body)),
 		Body:        readSeekNopCloser{bytes.NewReader(body)},
 	}, simplestorage.WithAccessType(simplestorage.AccessPrivate)); err != nil {
-		return fmt.Errorf("putting %s: %w", indexKey, err)
+		return fmt.Errorf("putting %s: %w", dbstore.IndexKey, err)
 	}
 
 	return nil

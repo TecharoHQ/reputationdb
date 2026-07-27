@@ -19,6 +19,7 @@ import (
 	"time"
 
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
+	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	"github.com/facebookgo/flagenv"
 	simplestorage "github.com/tigrisdata/storage-go/simplestorage"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -66,8 +67,8 @@ func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) er
 		return fmt.Errorf("reading database %s: %w", dbPath, err)
 	}
 
-	id := versionID(raw)
-	key := objectKey(id)
+	id := dbstore.VersionID(raw)
+	key := dbstore.ObjectKey(id)
 	lg.Info("read database", "path", dbPath, "bytes", len(raw), "version_id", id)
 
 	// Read provenance before uploading anything: a repo we can't read is fatal,
@@ -112,7 +113,7 @@ func run(ctx context.Context, lg *slog.Logger, st objectStore, dbPath string) er
 		// The objects stay in the bucket so clients holding an older version ID
 		// can still fetch them; only the index forgets about them.
 		lg.Info("version aged out of the index; its object was left in place",
-			"version_id", v.GetVersionId(), "key", objectKey(v.GetVersionId()))
+			"version_id", v.GetVersionId(), "key", dbstore.ObjectKey(v.GetVersionId()))
 	}
 
 	lg.Info("published database",

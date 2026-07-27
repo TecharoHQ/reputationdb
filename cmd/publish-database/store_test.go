@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
+	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	simplestorage "github.com/tigrisdata/storage-go/simplestorage"
 )
 
@@ -96,7 +97,7 @@ func TestLoadIndexExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encodeIndex() error = %v", err)
 	}
-	store.objects[indexKey] = encoded
+	store.objects[dbstore.IndexKey] = encoded
 
 	got, err := loadIndex(context.Background(), store, discardLogger())
 	if err != nil {
@@ -120,7 +121,7 @@ func TestLoadIndexListErrorPropagates(t *testing.T) {
 
 func TestLoadIndexGetErrorPropagates(t *testing.T) {
 	store := newFakeStore()
-	store.objects[indexKey] = []byte("present")
+	store.objects[dbstore.IndexKey] = []byte("present")
 	store.getErr = errors.New("network is on fire")
 
 	if _, err := loadIndex(context.Background(), store, discardLogger()); err == nil {
@@ -149,8 +150,8 @@ func TestSaveIndexRoundTrips(t *testing.T) {
 	if err := saveIndex(context.Background(), store, want); err != nil {
 		t.Fatalf("saveIndex() error = %v", err)
 	}
-	if len(store.puts) != 1 || store.puts[0] != indexKey {
-		t.Fatalf("saveIndex() put keys = %v, want [%q]", store.puts, indexKey)
+	if len(store.puts) != 1 || store.puts[0] != dbstore.IndexKey {
+		t.Fatalf("saveIndex() put keys = %v, want [%q]", store.puts, dbstore.IndexKey)
 	}
 
 	got, err := loadIndex(context.Background(), store, discardLogger())
@@ -214,11 +215,11 @@ func TestRunPublishesDatabaseAndIndex(t *testing.T) {
 		t.Fatalf("run() error = %v", err)
 	}
 
-	wantKey := objectKey(versionID(raw))
+	wantKey := dbstore.ObjectKey(dbstore.VersionID(raw))
 	if _, ok := store.objects[wantKey]; !ok {
 		t.Errorf("run() did not upload the database at %q; objects = %v", wantKey, store.puts)
 	}
-	if _, ok := store.objects[indexKey]; !ok {
+	if _, ok := store.objects[dbstore.IndexKey]; !ok {
 		t.Fatal("run() did not write the version index")
 	}
 
@@ -226,8 +227,8 @@ func TestRunPublishesDatabaseAndIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadIndex() error = %v", err)
 	}
-	if len(idx.GetVersions()) != 1 || idx.GetVersions()[0].GetVersionId() != versionID(raw) {
-		t.Errorf("index versions = %v, want exactly one version with ID %q", idx.GetVersions(), versionID(raw))
+	if len(idx.GetVersions()) != 1 || idx.GetVersions()[0].GetVersionId() != dbstore.VersionID(raw) {
+		t.Errorf("index versions = %v, want exactly one version with ID %q", idx.GetVersions(), dbstore.VersionID(raw))
 	}
 
 	// Republishing the same bytes is content-addressed: the index should still
@@ -262,7 +263,7 @@ func TestRunFailedUploadNeverWritesIndex(t *testing.T) {
 		t.Fatal("run() error = nil, want the upload error to propagate")
 	}
 
-	if _, ok := store.objects[indexKey]; ok {
+	if _, ok := store.objects[dbstore.IndexKey]; ok {
 		t.Error("run() wrote the index even though the database upload failed")
 	}
 	if len(store.puts) != 0 {

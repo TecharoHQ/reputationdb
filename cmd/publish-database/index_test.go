@@ -6,6 +6,7 @@ import (
 	"time"
 
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
+	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -116,14 +117,14 @@ func TestInsertVersionTrimsToMax(t *testing.T) {
 
 	// Fill the index to capacity: v0 (newest) .. v9 (oldest).
 	var existing []*fetchv1.DatabaseVersion
-	for i := range maxVersions {
+	for i := range dbstore.MaxVersions {
 		existing = append(existing, testVersion(fmt.Sprintf("v%d", i), at.Add(-time.Duration(i)*time.Hour)))
 	}
 
 	kept, evicted := insertVersion(existing, testVersion("newest", at.Add(time.Hour)))
 
-	if len(kept) != maxVersions {
-		t.Fatalf("insertVersion() kept %d versions, want %d", len(kept), maxVersions)
+	if len(kept) != dbstore.MaxVersions {
+		t.Fatalf("insertVersion() kept %d versions, want %d", len(kept), dbstore.MaxVersions)
 	}
 	if kept[0].GetVersionId() != "newest" {
 		t.Errorf("kept[0].VersionId = %q, want %q", kept[0].GetVersionId(), "newest")

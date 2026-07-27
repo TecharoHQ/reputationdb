@@ -7,6 +7,7 @@ import (
 	"io"
 
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
+	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -56,7 +57,7 @@ func decodeIndex(gzipped []byte) (*fetchv1.ListResponse, error) {
 }
 
 // insertVersion returns the version list with v prepended, trimmed to the
-// maxVersions most recent entries. The list is ordered newest-first.
+// dbstore.MaxVersions most recent entries. The list is ordered newest-first.
 //
 // Any existing entry with the same version ID is dropped: republishing an
 // identical database is content-addressed to the same ID, and should refresh
@@ -73,9 +74,9 @@ func insertVersion(versions []*fetchv1.DatabaseVersion, v *fetchv1.DatabaseVersi
 		kept = append(kept, old)
 	}
 
-	if len(kept) > maxVersions {
-		evicted = kept[maxVersions:]
-		kept = kept[:maxVersions:maxVersions]
+	if len(kept) > dbstore.MaxVersions {
+		evicted = kept[dbstore.MaxVersions:]
+		kept = kept[:dbstore.MaxVersions:dbstore.MaxVersions]
 	}
 
 	return kept, evicted
