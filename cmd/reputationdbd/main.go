@@ -30,7 +30,7 @@ var (
 	slogLevel   = flag.String("slog-level", "info", "Logging level")
 
 	githubToken  = flag.String("github-token", "", "GitHub API token")
-	tigrisBucket = flag.String("tigris-bucket", "", "Tigris bucket")
+	tigrisBucket = flag.String("tigris-bucket", "techaro-reputationdb", "Tigris bucket holding the published databases")
 )
 
 func main() {
