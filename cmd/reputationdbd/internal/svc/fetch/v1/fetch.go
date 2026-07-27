@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/TecharoHQ/reputationdb/cmd/reputationdbd/internal"
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore"
@@ -101,4 +102,15 @@ func (s *Server) index(ctx context.Context) (*fetchv1.ListResponse, error) {
 	s.cachedAt = s.now()
 
 	return idx, nil
+}
+
+// List returns every database version the index currently retains.
+func (s *Server) List(ctx context.Context, req *connect.Request[fetchv1.ListRequest]) (*connect.Response[fetchv1.ListResponse], error) {
+	idx, err := s.index(ctx)
+	if err != nil {
+		s.lg.ErrorContext(ctx, "can't read the version index", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+
+	return connect.NewResponse(&fetchv1.ListResponse{Versions: idx.GetVersions()}), nil
 }

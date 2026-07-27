@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore"
 	"github.com/TecharoHQ/reputationdb/internal/dbstore/dbstoretest"
@@ -92,5 +93,54 @@ func TestIndexRefetchFailureDoesNotServeStale(t *testing.T) {
 	}
 	if len(got.GetVersions()) != 1 {
 		t.Errorf("index() = %d versions after recovery, want 1", len(got.GetVersions()))
+	}
+}
+
+func TestListReturnsIndexVersions(t *testing.T) {
+	store := dbstoretest.New()
+	seedIndex(t, store,
+		&fetchv1.DatabaseVersion{VersionId: "newest", RepoShasum: "aaa"},
+		&fetchv1.DatabaseVersion{VersionId: "older", RepoShasum: "bbb"},
+	)
+
+	s := newServer(store, discardLogger())
+	resp, err := s.List(context.Background(), connect.NewRequest(&fetchv1.ListRequest{}))
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	got := resp.Msg.GetVersions()
+	if len(got) != 2 {
+		t.Fatalf("List() returned %d versions, want 2", len(got))
+	}
+	// Newest first, in the order the publisher wrote them.
+	if got[0].GetVersionId() != "newest" || got[1].GetVersionId() != "older" {
+		t.Errorf("List() order = [%q %q], want [newest older]", got[0].GetVersionId(), got[1].GetVersionId())
+	}
+	if got[0].GetRepoShasum() != "aaa" {
+		t.Errorf("List() dropped metadata: repo_shasum = %q, want %q", got[0].GetRepoShasum(), "aaa")
+	}
+}
+
+func TestListEmptyIndex(t *testing.T) {
+	s := newServer(dbstoretest.New(), discardLogger())
+
+	resp, err := s.List(context.Background(), connect.NewRequest(&fetchv1.ListRequest{}))
+	if err != nil {
+		t.Fatalf("List() error = %v, want an empty list rather than an error", err)
+	}
+	if len(resp.Msg.GetVersions()) != 0 {
+		t.Errorf("List() returned %d versions, want 0", len(resp.Msg.GetVersions()))
+	}
+}
+
+func TestListStoreFailureIsUnavailable(t *testing.T) {
+	store := dbstoretest.New()
+	store.ListErr = errors.New("network is on fire")
+
+	s := newServer(store, discardLogger())
+	_, err := s.List(context.Background(), connect.NewRequest(&fetchv1.ListRequest{}))
+	if got := connect.CodeOf(err); got != connect.CodeUnavailable {
+		t.Errorf("List() code = %v, want %v", got, connect.CodeUnavailable)
 	}
 }
