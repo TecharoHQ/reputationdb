@@ -130,7 +130,7 @@ func validVersionID(id string) bool {
 	if len(id) != dbstore.VersionIDLength {
 		return false
 	}
-	_, err := base64.RawURLEncoding.DecodeString(id)
+	_, err := base64.RawURLEncoding.Strict().DecodeString(id)
 	return err == nil
 }
 

@@ -106,9 +106,10 @@ go build -o ./var/reputationdbd ./cmd/reputationdbd
 ./var/reputationdbd
 ```
 
-It reads the same Tigris bucket `publish-database` writes to, via
-`-tigris-bucket` (or `TIGRIS_BUCKET`), defaulting to `techaro-reputationdb`,
-and needs the same Tigris credentials in `.env`. It also needs `-github-token`
+It reads the same Tigris bucket `publish-database` writes to: both binaries
+take the same `-tigris-storage-bucket` flag (or `TIGRIS_STORAGE_BUCKET` env
+var), defaulting to `techaro-reputationdb`, so they point at one bucket by
+default. It also needs the same Tigris credentials in `.env` and `-github-token`
 (or `GITHUB_TOKEN`) to serve the free datacentre database, whose download URL
 comes from the GitHub release rather than from Tigris.
 
