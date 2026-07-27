@@ -330,6 +330,17 @@ func TestCacheRefreshFailures(t *testing.T) {
 			tt.setup(t, src)
 
 			dir := t.TempDir()
+
+			// A file Refresh has no business touching. Seeding it makes the
+			// residue assertion below meaningful even on failure paths that
+			// bail out before anything could be written: the count can then
+			// actually fall (cleanup overreached) or rise (residue), instead
+			// of being a foregone 0 == 0.
+			sentinel := filepath.Join(dir, "sentinel")
+			if err := os.WriteFile(sentinel, nil, 0o600); err != nil {
+				t.Fatalf("seeding %s: %v", sentinel, err)
+			}
+
 			c := newCache(t, src, dir)
 
 			if err := c.Refresh(t.Context()); err == nil {
@@ -341,8 +352,8 @@ func TestCacheRefreshFailures(t *testing.T) {
 			if _, _, loaded, _ := c.Query(nil); loaded {
 				t.Error("Query() loaded = true after a failed refresh, want false")
 			}
-			if got := countCacheFiles(t, dir); got != 0 {
-				t.Errorf("the cache directory holds %d files after a failed refresh, want 0", got)
+			if got := countCacheFiles(t, dir); got != 1 {
+				t.Errorf("the cache directory holds %d files after a failed refresh, want 1 (the sentinel alone)", got)
 			}
 		})
 	}
