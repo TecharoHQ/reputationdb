@@ -19,7 +19,7 @@ target "caddy" {
   dockerfile = "docker/caddy-maat.Dockerfile"
   platforms  = ["linux/amd64", "linux/arm64"]
   tags = [
-    "${REGISTRY}/${OWNER}/caddy-maat:${VERSION}",
+    "${REGISTRY}/${OWNER}/reputationdb/caddy-maat:${VERSION}",
   ]
 }
 
