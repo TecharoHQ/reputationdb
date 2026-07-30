@@ -605,6 +605,13 @@ var fileSources = []fileSource{
 		provider: "sourceware",
 		category: vpnip.CategoryAbuse,
 	},
+	{
+		// Addresses caught by Xe's Limsa Lominsa honeypot on 2026-07-30.
+		name:     "20260730-limsa-lominsa-honeypot",
+		path:     "data/manually-submitted/xe/20260730-limsa-lominsa-honeypot.txt",
+		provider: "techaro",
+		category: vpnip.CategoryAbuse,
+	},
 
 	// Per-network blackhole lists submitted by nochan on 2026-07-14, one file per
 	// network. Every list names the network it blackholes, so each entry keeps
