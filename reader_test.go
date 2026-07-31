@@ -2,8 +2,10 @@ package reputationdb
 
 import (
 	"bytes"
+	"maps"
 	"net"
 	"net/netip"
+	"slices"
 	"testing"
 
 	"github.com/maxmind/mmdbwriter"
@@ -100,4 +102,68 @@ func TestDBLookup(t *testing.T) {
 			t.Error("8.8.8.8 unexpectedly found")
 		}
 	})
+}
+
+func TestDBNetworks(t *testing.T) {
+	vpn := Record{}
+	vpn.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryVPN})
+
+	crawler := Record{}
+	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryCrawler})
+
+	db := buildDB(t, map[string]Record{
+		"1.2.3.4/32":     vpn,
+		"9.9.9.0/24":     crawler,
+		"2606:4700::/32": crawler,
+	})
+
+	got := map[string]Result{}
+	for network, err := range db.Networks() {
+		if err != nil {
+			t.Fatalf("Networks: %v", err)
+		}
+		if _, dupe := got[network.Prefix.String()]; dupe {
+			// An IPv4 network lives in the ::ffff:0:0/96 subtree of an IPv6
+			// database and is aliased into 2001::/32 and 2002::/16. Walking
+			// those aliases would report every IPv4 prefix three times over.
+			t.Fatalf("prefix %s yielded more than once", network.Prefix)
+		}
+		res, err := network.Result()
+		if err != nil {
+			t.Fatalf("Result for %s: %v", network.Prefix, err)
+		}
+		got[network.Prefix.String()] = res
+	}
+
+	// IPv4 prefixes must come back in their IPv4 spelling rather than as the
+	// ::ffff:1.2.3.4/128 the tree actually stores, or the output is unusable as
+	// an IP list.
+	want := []string{"1.2.3.4/32", "9.9.9.0/24", "2606:4700::/32"}
+	gotPrefixes := slices.Sorted(maps.Keys(got))
+	if !slices.Equal(gotPrefixes, slices.Sorted(slices.Values(want))) {
+		t.Logf("want: %v", want)
+		t.Logf("got:  %v", gotPrefixes)
+		t.Fatal("got wrong set of prefixes")
+	}
+
+	if res := got["1.2.3.4/32"]; !res.IsVPN || !res.HasProvider("nordvpn") {
+		t.Errorf("record at 1.2.3.4/32 did not decode: %+v", res)
+	}
+	if res := got["2606:4700::/32"]; !res.IsCrawler {
+		t.Errorf("record at 2606:4700::/32 did not decode: %+v", res)
+	}
+}
+
+// TestDBNetworksSkipsEmptyDatabase checks that walking a database with nothing
+// in it terminates without yielding anything, rather than reporting the whole
+// address space as one record.
+func TestDBNetworksSkipsEmptyDatabase(t *testing.T) {
+	db := buildDB(t, nil)
+
+	for network, err := range db.Networks() {
+		if err != nil {
+			t.Fatalf("Networks: %v", err)
+		}
+		t.Errorf("empty database yielded %s", network.Prefix)
+	}
 }
