@@ -38,3 +38,7 @@ node_modules/
 # it does not descend into nested ignore files. Without this line every docker
 # build ships the ~1GB of databases under var/ to the daemon.
 var/
+
+# Claude Code worktrees. Also keeps them out of the Docker build context, since
+# .dockerignore is a symlink to this file.
+.claude/worktrees/
