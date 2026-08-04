@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -258,6 +259,16 @@ var httpSources = []httpSource{
 		url:      "https://iplists.firehol.org/files/firehol_level1.netset",
 		provider: "firehol-level1",
 		category: vpnip.CategoryAbuse,
+	},
+	{
+		// UCEPROTECT Level 3, an rbldnsd zone served gzipped. Level 3 lists the
+		// whole announced space of an AS after enough spam from that AS, so it is
+		// broad by design: it covers entire networks, not single senders.
+		name:     "wget-mirrors.uceprotect.net",
+		url:      "http://wget-mirrors.uceprotect.net/rbldnsd-all/dnsbl-3.uceprotect.net.gz",
+		provider: "uceprotect",
+		category: vpnip.CategoryAbuse,
+		parse:    parseRBLDNSD,
 	},
 	{
 		name:     "github.com/kraloveckey/ipsets-blocklist",
@@ -1275,6 +1286,33 @@ func parseColonHost(data []byte) []netip.Prefix {
 	return out
 }
 
+// parseRBLDNSD parses rbldnsd zone files, whose data lines start with a bare IP
+// address or CIDR range, followed by whitespace and the free-text reason the
+// entry is listed, e.g. the UCEPROTECT blocklists:
+//
+//	217.147.171.0/24 Your ISP TSS-AS, UA/AS207305 is UCEPROTECT-Level3 listed ...
+//
+// Only the leading address is kept. Blank lines, "#" comments, and rbldnsd
+// directives ("$" defaults, ":" result templates, "!" exclusions) do not parse
+// as a prefix, so they are skipped.
+func parseRBLDNSD(data []byte) []netip.Prefix {
+	var out []netip.Prefix
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		field := line
+		if i := strings.IndexAny(line, " \t"); i >= 0 {
+			field = line[:i]
+		}
+		if p, ok := parsePrefixField(field); ok {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // parsePrefixField turns a single bare-IP or CIDR token into a masked prefix.
 // Bare addresses become host prefixes (/32 or /128). It reports false for empty
 // or unparseable tokens.
@@ -1942,7 +1980,7 @@ func fetchHTTP(ctx context.Context, client *http.Client, src httpSource, cacheDi
 		cachePath = filepath.Join(cacheDir, "sources", filepath.FromSlash(src.name), httpListName(src.url))
 		if data, ok := readFreshCache(cachePath); ok {
 			slog.Info("using cached list", "source", src.name, "path", cachePath)
-			return data, nil
+			return gunzip(data)
 		}
 	}
 
@@ -1974,7 +2012,32 @@ func fetchHTTP(ctx context.Context, client *http.Client, src httpSource, cacheDi
 		}
 	}
 
-	return data, nil
+	return gunzip(data)
+}
+
+// gunzip decompresses data when it starts with the gzip magic number, and
+// returns data unchanged otherwise.
+//
+// Some upstreams publish a .gz file instead of plain text. The body of such a
+// response is gzip content, not a gzip Content-Encoding, so net/http hands it
+// back compressed. The cache keeps the compressed bytes, so this runs on the
+// cached copy too.
+func gunzip(data []byte) ([]byte, error) {
+	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
+		return data, nil
+	}
+
+	zr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("reading gzip header: %w", err)
+	}
+	defer zr.Close()
+
+	out, err := io.ReadAll(zr)
+	if err != nil {
+		return nil, fmt.Errorf("decompressing gzip body: %w", err)
+	}
+	return out, nil
 }
 
 // httpListName returns the cache filename for an HTTP source URL: its last path

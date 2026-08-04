@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -460,6 +462,131 @@ func TestParseCSVFirstField(t *testing.T) {
 		if p := netip.MustParsePrefix(w); got[i] != p {
 			t.Errorf("prefix %d: got %s, want %s", i, got[i], p)
 		}
+	}
+}
+
+func TestParseRBLDNSD(t *testing.T) {
+	in := strings.Join([]string{
+		"# THIS IS UCEPROTECT-BLACKLIST LEVEL 3",
+		"",
+		"217.147.171.0/24 Your ISP TSS-AS, UA/AS207305 is UCEPROTECT-Level3 listed because of a spamscore of 44921.9.",
+		"213.252.243.0/24\tYour ISP BITEMOBILE-, LT/AS211614 is UCEPROTECT-Level3 listed.",
+		"203.0.113.4 single host, no mask",
+		"2001:db8::/32 an ipv6 network",
+		"$SOA 600 dnsbl.example. hostmaster.example. 0 600 300 86400 600",
+		":127.0.0.2:listed, see http://example.com",
+		"!198.51.100.7",
+		"not-an-ip with a reason",
+	}, "\n")
+	want := []string{
+		"217.147.171.0/24",
+		"213.252.243.0/24",
+		"203.0.113.4/32",
+		"2001:db8::/32",
+	}
+
+	got := parseRBLDNSD([]byte(in))
+	if len(got) != len(want) {
+		t.Fatalf("got %d prefixes %v, want %d %v", len(got), got, len(want), want)
+	}
+	for i, w := range want {
+		if p := netip.MustParsePrefix(w); got[i] != p {
+			t.Errorf("prefix %d: got %s, want %s", i, got[i], p)
+		}
+	}
+}
+
+func TestGunzip(t *testing.T) {
+	const body = "203.0.113.4/32 listed\n"
+
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write([]byte(body)); err != nil {
+		t.Fatalf("write gzip body: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close gzip writer: %v", err)
+	}
+
+	got, err := gunzip(buf.Bytes())
+	if err != nil {
+		t.Fatalf("gunzip compressed: %v", err)
+	}
+	if string(got) != body {
+		t.Errorf("gunzip compressed = %q, want %q", got, body)
+	}
+
+	// Plain text passes through untouched.
+	got, err = gunzip([]byte(body))
+	if err != nil {
+		t.Fatalf("gunzip plain: %v", err)
+	}
+	if string(got) != body {
+		t.Errorf("gunzip plain = %q, want %q", got, body)
+	}
+
+	// A truncated gzip stream is an error, not silent empty output.
+	if _, err := gunzip(buf.Bytes()[:4]); err == nil {
+		t.Error("expected error on truncated gzip data, got nil")
+	}
+}
+
+// TestCollectHTTPGzip checks that a source served as a .gz file is decompressed
+// before it is parsed, on both the download and the cache-hit path.
+func TestCollectHTTPGzip(t *testing.T) {
+	const body = "# uceprotect level 3\n198.51.100.0/24 Your ISP EXAMPLE, XX/AS64500 is listed.\n203.0.113.4 single host\n"
+
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write([]byte(body)); err != nil {
+		t.Fatalf("write gzip body: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close gzip writer: %v", err)
+	}
+
+	var hits atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		if _, err := w.Write(buf.Bytes()); err != nil {
+			t.Errorf("write body: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	src := httpSource{
+		name:     "wget-mirrors.uceprotect.net",
+		url:      srv.URL + "/rbldnsd-all/dnsbl-3.uceprotect.net.gz",
+		provider: "uceprotect",
+		category: vpnip.CategoryAbuse,
+		parse:    parseRBLDNSD,
+	}
+
+	cacheDir := t.TempDir()
+	store := &bart.Table[*vpnip.Record]{}
+	n, err := collectHTTP(context.Background(), srv.Client(), src, cacheDir, store)
+	if err != nil {
+		t.Fatalf("collectHTTP: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("collectHTTP counted %d prefixes, want 2", n)
+	}
+
+	rec := getRec(store, netip.MustParsePrefix("198.51.100.0/24"))
+	if rec == nil {
+		t.Fatal("expected record for 198.51.100.0/24")
+	}
+	if m := rec.Sources[0]; m.Provider != "uceprotect" || m.List != "dnsbl-3.uceprotect.net.gz" {
+		t.Errorf("membership = %+v, want provider uceprotect and list dnsbl-3.uceprotect.net.gz", m)
+	}
+
+	// The cache holds the compressed bytes, so the second run decompresses the
+	// cached copy without hitting the network again.
+	if _, err := collectHTTP(context.Background(), srv.Client(), src, cacheDir, &bart.Table[*vpnip.Record]{}); err != nil {
+		t.Fatalf("collectHTTP cached: %v", err)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Errorf("server saw %d requests, want 1 (second run must use the cache)", got)
 	}
 }
 
