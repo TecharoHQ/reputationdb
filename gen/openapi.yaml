@@ -290,6 +290,8 @@ components:
           title: Version ID
           description: The version ID of the database to download, as returned by the list endpoint
       title: Fetch Request
+      required:
+        - version_id
       additionalProperties: false
       description: A request for a download URL for one published database version.
     techaro.lol.reputationdb.fetch.v1.FetchResponse:
@@ -318,6 +320,8 @@ components:
           title: Version ID
           description: The version ID of the database to describe, as returned by the list endpoint
       title: Info Request
+      required:
+        - version_id
       additionalProperties: false
       description: A request for metadata about one published database version, without a download URL.
     techaro.lol.reputationdb.fetch.v1.InfoResponse:

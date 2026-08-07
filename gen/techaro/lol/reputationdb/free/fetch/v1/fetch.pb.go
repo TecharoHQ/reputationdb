@@ -11,7 +11,6 @@ import (
 	sync "sync"
 	unsafe "unsafe"
 
-	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "github.com/google/gnostic/openapiv3"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	_ "google.golang.org/genproto/googleapis/api/visibility"
@@ -136,7 +135,7 @@ var File_techaro_lol_reputationdb_free_fetch_v1_fetch_proto protoreflect.FileDes
 
 const file_techaro_lol_reputationdb_free_fetch_v1_fetch_proto_rawDesc = "" +
 	"\n" +
-	"2techaro/lol/reputationdb/free/fetch/v1/fetch.proto\x12&techaro.lol.reputationdb.free.fetch.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe1\x01\n" +
+	"2techaro/lol/reputationdb/free/fetch/v1/fetch.proto\x12&techaro.lol.reputationdb.free.fetch.v1\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe1\x01\n" +
 	"\fFetchRequest:\xd0\x01\xbaG\xcc\x01J\x12Free Fetch Request\x92\x02\xb4\x01A request for a download URL for the current free datacentre-only database. Takes no parameters: the free tier always serves the latest build rather than a caller-selected version.\"\xcd\x06\n" +
 	"\rFetchResponse\x12\x91\x01\n" +
 	"\blifetime\x18\x01 \x01(\v2\x19.google.protobuf.DurationBZ\xbaGWJ\bLifetime\x92\x02JHow long the client should wait before checking for a newer database buildR\blifetime\x12\x8a\x01\n" +

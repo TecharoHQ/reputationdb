@@ -30,10 +30,13 @@ message FetchRequest {
     description: "A request for a download URL for one published database version."
   };
 
-  string version_id = 1 [(gnostic.openapi.v3.property) = {
-    title: "Version ID"
-    description: "The version ID of the database to download, as returned by the list endpoint"
-  }];
+  string version_id = 1 [
+    (gnostic.openapi.v3.property) = {
+      title: "Version ID"
+      description: "The version ID of the database to download, as returned by the list endpoint"
+    },
+    (buf.validate.field).required = true
+  ];
 }
 
 message DatabaseVersion {
@@ -92,10 +95,13 @@ message InfoRequest {
     description: "A request for metadata about one published database version, without a download URL."
   };
 
-  string version_id = 1 [(gnostic.openapi.v3.property) = {
-    title: "Version ID"
-    description: "The version ID of the database to describe, as returned by the list endpoint"
-  }];
+  string version_id = 1 [
+    (gnostic.openapi.v3.property) = {
+      title: "Version ID"
+      description: "The version ID of the database to describe, as returned by the list endpoint"
+    },
+    (buf.validate.field).required = true
+  ];
 }
 
 message InfoResponse {
