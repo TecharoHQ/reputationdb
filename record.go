@@ -7,9 +7,12 @@ import (
 	"github.com/maxmind/mmdbwriter/mmdbtype"
 )
 
-// Category groups the kind of list an IP address was found on. It is stored on
-// every [ListMembership] and surfaced as top-level booleans on the mmdb record
-// so consumers can branch on it cheaply.
+// The name of each category, as a person writes it on a command line or in a
+// configuration file.
+//
+// These names live at the edges of the system only. Nothing stores them.
+// [FromCategories] turns a set of them into the [CategoryByte] that the rest of
+// the code uses.
 const (
 	CategoryVPN        = "vpn"
 	CategoryDatacenter = "datacenter"
@@ -32,8 +35,8 @@ type ListMembership struct {
 	// Provider is the VPN/service name derived from the list file name, e.g.
 	// "nordvpn", "tunnelbear", or "datacentres".
 	Provider string `maxminddb:"provider"`
-	// Category is one of the Category* constants describing what kind of list
-	// this is.
+	// Category describes what kind of list this is. A single list is normally
+	// exactly one category, but the type is a bitmask, so it can be more.
 	Category CategoryByte `maxminddb:"category"`
 }
 
@@ -70,21 +73,12 @@ func (r *Record) sort() {
 	})
 }
 
-// Categories returns the distinct, sorted set of categories this address
-// belongs to.
-func (r *Record) Categories() []string {
-	seen := map[string]bool{}
-	var result []string
+// Categories returns the union of the categories of every source in the record.
+func (r *Record) Categories() CategoryByte {
+	var result CategoryByte
 	for _, s := range r.Sources {
-		cats := s.Category.Strings()
-		for _, cat := range cats {
-			if !seen[cat] {
-				seen[cat] = true
-				result = append(result, cat)
-			}
-		}
+		result |= s.Category
 	}
-	sort.Strings(result)
 	return result
 }
 
@@ -107,26 +101,18 @@ func (r *Record) Providers() []string {
 // inserted into the search tree. The schema is:
 //
 //	{
-//	  "is_vpn":        bool,
-//	  "is_datacenter": bool,
-//	  "is_crawler":    bool,
-//	  "is_proxy":      bool,
-//	  "is_abuse":      bool,
-//	  "is_tor":        bool,
-//	  "categories":    []string,
-//	  "providers":     []string,
-//	  "sources":       [{repository, list, provider, category}, ...]
+//	  "categories": uint16,
+//	  "providers":  []string,
+//	  "sources":    [{repository, list, provider, category}, ...]
 //	}
+//
+// Both category fields are [CategoryByte] bitmasks, not strings. See
+// [CategoryByte] for why.
+//
+// The top-level mask is the union of the masks of the sources. A caller that
+// only needs to know what an address is does not have to read the sources.
 func (r *Record) DataType() mmdbtype.DataType {
 	r.sort()
-
-	categories := r.Categories()
-	catSet := make(map[string]bool, len(categories))
-	catSlice := make(mmdbtype.Slice, 0, len(categories))
-	for _, c := range categories {
-		catSet[c] = true
-		catSlice = append(catSlice, mmdbtype.String(c))
-	}
 
 	providers := r.Providers()
 	provSlice := make(mmdbtype.Slice, 0, len(providers))
@@ -140,19 +126,13 @@ func (r *Record) DataType() mmdbtype.DataType {
 			"repository": mmdbtype.String(s.Repository),
 			"list":       mmdbtype.String(s.List),
 			"provider":   mmdbtype.String(s.Provider),
-			"category":   mmdbtype.String(s.Category.String()),
+			"category":   mmdbtype.Uint16(s.Category),
 		})
 	}
 
 	return mmdbtype.Map{
-		"is_vpn":        mmdbtype.Bool(catSet[CategoryVPN]),
-		"is_datacenter": mmdbtype.Bool(catSet[CategoryDatacenter]),
-		"is_crawler":    mmdbtype.Bool(catSet[CategoryCrawler]),
-		"is_proxy":      mmdbtype.Bool(catSet[CategoryProxy]),
-		"is_abuse":      mmdbtype.Bool(catSet[CategoryAbuse]),
-		"is_tor":        mmdbtype.Bool(catSet[CategoryTor]),
-		"categories":    catSlice,
-		"providers":     provSlice,
-		"sources":       sources,
+		"categories": mmdbtype.Uint16(r.Categories()),
+		"providers":  provSlice,
+		"sources":    sources,
 	}
 }

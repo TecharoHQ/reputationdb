@@ -880,8 +880,8 @@ func TestMergeContained(t *testing.T) {
 	if len(rec.Sources) != 3 {
 		t.Fatalf("/32 sources = %d, want 3: %+v", len(rec.Sources), rec.Sources)
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryAbuse || cats[1] != vpnip.CategoryVPN {
-		t.Errorf("/32 categories = %v, want [abuse vpn]", cats)
+	if want := vpnip.CategoryByteAbuse | vpnip.CategoryByteVPN; rec.Categories() != want {
+		t.Errorf("/32 categories = %v, want %v", rec.Categories(), want)
 	}
 
 	// /24 inherits only the /16; it must NOT gain the narrower /32's membership.
@@ -985,8 +985,8 @@ func TestFoldAS(t *testing.T) {
 			t.Errorf("membership = %+v, want repo stat.ripe.net / list AS136907 / provider huawei-cloud", m)
 		}
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryAbuse || cats[1] != vpnip.CategoryDatacenter {
-		t.Errorf("categories = %v, want [abuse datacenter]", cats)
+	if want := vpnip.CategoryByteAbuse | vpnip.CategoryByteDatacenter; rec.Categories() != want {
+		t.Errorf("categories = %v, want %v", rec.Categories(), want)
 	}
 }
 
@@ -1019,8 +1019,8 @@ func TestCollectASCache(t *testing.T) {
 	if rec == nil {
 		t.Fatal("expected record for 1.2.3.0/24 from cache")
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryAbuse || cats[1] != vpnip.CategoryDatacenter {
-		t.Errorf("categories = %v, want [abuse datacenter]", cats)
+	if want := vpnip.CategoryByteAbuse | vpnip.CategoryByteDatacenter; rec.Categories() != want {
+		t.Errorf("categories = %v, want %v", rec.Categories(), want)
 	}
 
 	// A stale cache (aged past cacheMaxAge) must not be served; with no network
@@ -1068,8 +1068,8 @@ func TestCollect(t *testing.T) {
 	if len(rec.Sources) != 2 {
 		t.Fatalf("1.2.3.4/32: got %d sources, want 2: %+v", len(rec.Sources), rec.Sources)
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryDatacenter || cats[1] != vpnip.CategoryVPN {
-		t.Errorf("1.2.3.4/32 categories = %v, want [datacenter vpn]", cats)
+	if want := vpnip.CategoryByteDatacenter | vpnip.CategoryByteVPN; rec.Categories() != want {
+		t.Errorf("1.2.3.4/32 categories = %v, want %v", rec.Categories(), want)
 	}
 
 	// 5.6.7.8/32 appears on two vpn providers; providers should be deduped/sorted.

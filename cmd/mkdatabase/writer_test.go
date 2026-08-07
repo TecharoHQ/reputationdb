@@ -12,21 +12,17 @@ import (
 	maxminddb "github.com/oschwald/maxminddb-golang/v2"
 )
 
-// decoded mirrors the on-disk record schema for round-trip assertions.
+// decoded mirrors the on-disk record schema for round-trip assertions. This
+// package declares it again instead of reusing the reader type. Whoever changes
+// the schema must then edit both types, so this test sees every change.
 type decoded struct {
-	IsVPN        bool     `maxminddb:"is_vpn"`
-	IsDatacenter bool     `maxminddb:"is_datacenter"`
-	IsCrawler    bool     `maxminddb:"is_crawler"`
-	IsProxy      bool     `maxminddb:"is_proxy"`
-	IsAbuse      bool     `maxminddb:"is_abuse"`
-	IsTor        bool     `maxminddb:"is_tor"`
-	Categories   []string `maxminddb:"categories"`
-	Providers    []string `maxminddb:"providers"`
-	Sources      []struct {
-		Repository string `maxminddb:"repository"`
-		List       string `maxminddb:"list"`
-		Provider   string `maxminddb:"provider"`
-		Category   string `maxminddb:"category"`
+	Categories vpnip.CategoryByte `maxminddb:"categories"`
+	Providers  []string           `maxminddb:"providers"`
+	Sources    []struct {
+		Repository string             `maxminddb:"repository"`
+		List       string             `maxminddb:"list"`
+		Provider   string             `maxminddb:"provider"`
+		Category   vpnip.CategoryByte `maxminddb:"category"`
 	} `maxminddb:"sources"`
 }
 
@@ -74,14 +70,11 @@ func TestWriterRoundTrip(t *testing.T) {
 	if err := db.Lookup(netip.MustParseAddr("1.2.3.4")).Decode(&got); err != nil {
 		t.Fatalf("Lookup v4: %v", err)
 	}
-	if !got.IsVPN || !got.IsDatacenter || got.IsCrawler {
-		t.Errorf("1.2.3.4 flags: vpn=%v datacenter=%v crawler=%v, want true,true,false", got.IsVPN, got.IsDatacenter, got.IsCrawler)
+	if want := vpnip.CategoryByteVPN | vpnip.CategoryByteDatacenter; got.Categories != want {
+		t.Errorf("1.2.3.4 categories = %v, want %v", got.Categories, want)
 	}
 	if len(got.Sources) != 2 {
 		t.Errorf("1.2.3.4 sources = %d, want 2: %+v", len(got.Sources), got.Sources)
-	}
-	if len(got.Categories) != 2 {
-		t.Errorf("1.2.3.4 categories = %v, want 2", got.Categories)
 	}
 
 	// IPv6 lookup: should be crawler only.
@@ -89,8 +82,8 @@ func TestWriterRoundTrip(t *testing.T) {
 	if err := db.Lookup(netip.MustParseAddr("2606:4700::1")).Decode(&gotV6); err != nil {
 		t.Fatalf("Lookup v6: %v", err)
 	}
-	if gotV6.IsVPN || gotV6.IsDatacenter || !gotV6.IsCrawler {
-		t.Errorf("2606:4700::1 flags: vpn=%v datacenter=%v crawler=%v, want false,false,true", gotV6.IsVPN, gotV6.IsDatacenter, gotV6.IsCrawler)
+	if gotV6.Categories != vpnip.CategoryByteCrawler {
+		t.Errorf("2606:4700::1 categories = %v, want %v", gotV6.Categories, vpnip.CategoryByteCrawler)
 	}
 
 	// Unlisted address should not be found.
@@ -162,22 +155,22 @@ func TestDatacenterBuildDoesNotLeak(t *testing.T) {
 	if err := db.Lookup(netip.MustParseAddr("1.2.3.4")).Decode(&got); err != nil {
 		t.Fatalf("Lookup 1.2.3.4: %v", err)
 	}
-	if !got.IsDatacenter {
-		t.Error("1.2.3.4 is_datacenter = false, want true")
+	if !got.Categories.Has(vpnip.CategoryByteDatacenter) {
+		t.Error("1.2.3.4 is not a datacenter address, want it to be one")
 	}
-	if got.IsVPN {
-		t.Error("1.2.3.4 is_vpn = true: the VPN membership leaked into the free database")
+	if got.Categories.Has(vpnip.CategoryByteVPN) {
+		t.Error("1.2.3.4 is a VPN address: the VPN membership leaked into the free database")
 	}
 	if len(got.Sources) != 1 {
 		t.Errorf("1.2.3.4 sources = %d, want 1: %+v", len(got.Sources), got.Sources)
 	}
 	for _, s := range got.Sources {
-		if s.Category != vpnip.CategoryDatacenter {
+		if s.Category != vpnip.CategoryByteDatacenter {
 			t.Errorf("1.2.3.4 carries a %q source: %+v", s.Category, s)
 		}
 	}
-	if len(got.Categories) != 1 || got.Categories[0] != vpnip.CategoryDatacenter {
-		t.Errorf("1.2.3.4 categories = %v, want [datacenter]", got.Categories)
+	if got.Categories != vpnip.CategoryByteDatacenter {
+		t.Errorf("1.2.3.4 categories = %v, want %v", got.Categories, vpnip.CategoryByteDatacenter)
 	}
 
 	// A datacentre-only address reached via a CIDR range rather than a host
@@ -187,8 +180,8 @@ func TestDatacenterBuildDoesNotLeak(t *testing.T) {
 	if err := db.Lookup(netip.MustParseAddr("9.9.9.9")).Decode(&gotDC); err != nil {
 		t.Fatalf("Lookup 9.9.9.9: %v", err)
 	}
-	if !gotDC.IsDatacenter || gotDC.IsVPN {
-		t.Errorf("9.9.9.9 flags: datacenter=%v vpn=%v, want true,false", gotDC.IsDatacenter, gotDC.IsVPN)
+	if gotDC.Categories != vpnip.CategoryByteDatacenter {
+		t.Errorf("9.9.9.9 categories = %v, want %v", gotDC.Categories, vpnip.CategoryByteDatacenter)
 	}
 
 	// A VPN-only address must not be in the free database at all.
@@ -260,21 +253,21 @@ func TestASNBuildDoesNotLeak(t *testing.T) {
 	if err := db.Lookup(netip.MustParseAddr("9.9.9.9")).Decode(&got); err != nil {
 		t.Fatalf("Lookup 9.9.9.9: %v", err)
 	}
-	if !got.IsDatacenter {
+	if !got.Categories.Has(vpnip.CategoryByteDatacenter) {
 		t.Error("9.9.9.9 is_datacenter = false, want true")
 	}
-	if got.IsAbuse {
+	if got.Categories.Has(vpnip.CategoryByteAbuse) {
 		t.Error("9.9.9.9 is_abuse = true: the AS's abuse membership leaked into the free database")
 	}
 	if len(got.Sources) != 1 {
 		t.Errorf("9.9.9.9 sources = %d, want 1: %+v", len(got.Sources), got.Sources)
 	}
 	for _, s := range got.Sources {
-		if s.Category != vpnip.CategoryDatacenter {
+		if s.Category != vpnip.CategoryByteDatacenter {
 			t.Errorf("9.9.9.9 carries a %q source: %+v", s.Category, s)
 		}
 	}
-	if len(got.Categories) != 1 || got.Categories[0] != vpnip.CategoryDatacenter {
-		t.Errorf("9.9.9.9 categories = %v, want [datacenter]", got.Categories)
+	if got.Categories != vpnip.CategoryByteDatacenter {
+		t.Errorf("9.9.9.9 categories = %v, want %v", got.Categories, vpnip.CategoryByteDatacenter)
 	}
 }

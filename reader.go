@@ -11,19 +11,16 @@ import (
 // Result is the decoded record stored for an IP address in a vpnip database. It
 // mirrors the on-disk schema produced by [Record.DataType].
 type Result struct {
-	// IsVPN reports whether the address appears on at least one VPN provider
-	// list.
-	IsVPN bool `maxminddb:"is_vpn"`
-	// IsDatacenter reports whether the address falls within a known datacenter
-	// range.
-	IsDatacenter bool `maxminddb:"is_datacenter"`
-	// IsCrawler reports whether the address belongs to a known crawler/bot.
-	IsCrawler bool `maxminddb:"is_crawler"`
-	// IsProxy reports whether the address appears on an open/free proxy list.
-	IsProxy bool `maxminddb:"is_proxy"`
-	// Categories is the distinct, sorted set of categories the address belongs
-	// to (see the Category* constants).
-	Categories []string `maxminddb:"categories"`
+	// Categories is the union of the categories of every source for this address.
+	//
+	// [CategoryByte.Has] is the correct way to examine this field. A comparison
+	// for equality is wrong. An address on both a VPN list and a datacenter list
+	// has both bits set, so it equals neither one alone.
+	//
+	// A caller that starts from category names must convert them to a mask once
+	// with [FromCategories]. One call to [CategoryByte.Strings] for each result
+	// is much slower, because each call allocates.
+	Categories CategoryByte `maxminddb:"categories"`
 	// Providers is the distinct, sorted set of providers the address belongs to.
 	Providers []string `maxminddb:"providers"`
 	// Sources lists every upstream list/file the address was found on.
@@ -33,11 +30,6 @@ type Result struct {
 // HasProvider reports whether the result includes the named provider.
 func (r *Result) HasProvider(name string) bool {
 	return slices.Contains(r.Providers, name)
-}
-
-// HasCategory reports whether the result includes the named category.
-func (r *Result) HasCategory(name string) bool {
-	return slices.Contains(r.Categories, name)
 }
 
 // DB is a read-only handle to a vpnip mmdb database.

@@ -18,8 +18,8 @@ func TestCategoryByteToFromRoundtrip(t *testing.T) {
 			got := FromCategories(st)
 
 			if want != got {
-				t.Logf("want: %x (%v)", byte(want), st)
-				t.Logf(" got: %x (%v)", byte(got), got.Strings())
+				t.Logf("want: %x (%v)", uint16(want), st)
+				t.Logf(" got: %x (%v)", uint16(got), got.Strings())
 				t.Error("did not get expected information in the roundtrip")
 			}
 		})

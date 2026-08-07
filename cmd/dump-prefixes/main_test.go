@@ -96,7 +96,7 @@ func TestDump(t *testing.T) {
 		},
 		{
 			name:   "single category",
-			filter: filter{categories: []string{reputationdb.CategoryVPN}},
+			filter: filter{categories: reputationdb.CategoryByteVPN},
 			want:   []string{"1.2.3.4/32", "45.32.0.0/16"},
 			stats:  stats{prefixes: 4, decoded: 4, written: 2},
 		},
@@ -104,7 +104,7 @@ func TestDump(t *testing.T) {
 			// Two values of the same flag widen the selection: an address on
 			// either list is wanted.
 			name:   "two categories are a union",
-			filter: filter{categories: []string{reputationdb.CategoryVPN, reputationdb.CategoryCrawler}},
+			filter: filter{categories: reputationdb.CategoryByteVPN | reputationdb.CategoryByteCrawler},
 			want:   []string{"1.2.3.4/32", "45.32.0.0/16", "2606:4700::/32"},
 			stats:  stats{prefixes: 4, decoded: 4, written: 3},
 		},
@@ -118,7 +118,7 @@ func TestDump(t *testing.T) {
 			// Two different flags narrow the selection instead: each one is a
 			// further condition the record has to meet.
 			name:   "category and provider must both match",
-			filter: filter{categories: []string{reputationdb.CategoryDatacenter}, providers: []string{"mullvad"}},
+			filter: filter{categories: reputationdb.CategoryByteDatacenter, providers: []string{"mullvad"}},
 			want:   []string{"45.32.0.0/16"},
 			stats:  stats{prefixes: 4, decoded: 4, written: 1},
 		},
@@ -130,7 +130,7 @@ func TestDump(t *testing.T) {
 		},
 		{
 			name:   "category present in no record",
-			filter: filter{categories: []string{reputationdb.CategoryTor}},
+			filter: filter{categories: reputationdb.CategoryByteTor},
 			want:   nil,
 			stats:  stats{prefixes: 4, decoded: 4},
 		},
@@ -207,7 +207,7 @@ func TestParseFilter(t *testing.T) {
 		{
 			name:       "known categories are kept",
 			categories: []string{reputationdb.CategoryVPN, reputationdb.CategoryTor},
-			want:       filter{categories: []string{reputationdb.CategoryVPN, reputationdb.CategoryTor}},
+			want:       filter{categories: reputationdb.CategoryByteVPN | reputationdb.CategoryByteTor},
 		},
 		{
 			// A typo'd category would otherwise dump an empty file and look
@@ -252,13 +252,8 @@ func TestParseFilter(t *testing.T) {
 // filtersEqual compares two filters field by field, treating a nil slice and an
 // empty one as the same thing.
 func filtersEqual(a, b filter) bool {
-	if len(a.categories) != len(b.categories) || len(a.providers) != len(b.providers) {
+	if a.categories != b.categories || len(a.providers) != len(b.providers) {
 		return false
-	}
-	for i := range a.categories {
-		if a.categories[i] != b.categories[i] {
-			return false
-		}
 	}
 	for i := range a.providers {
 		if a.providers[i] != b.providers[i] {

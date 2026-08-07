@@ -97,12 +97,8 @@ func TestParseAddrsEchoesTheRequestedForm(t *testing.T) {
 
 func TestToRecord(t *testing.T) {
 	res := reputationdb.Result{
-		IsVPN:        true,
-		IsDatacenter: true,
-		IsCrawler:    false,
-		IsProxy:      false,
-		Categories:   []string{"datacenter", "vpn"},
-		Providers:    []string{"datacentres", "nordvpn"},
+		Categories: reputationdb.CategoryByteVPN | reputationdb.CategoryByteDatacenter,
+		Providers:  []string{"datacentres", "nordvpn"},
 		Sources: []reputationdb.ListMembership{
 			{
 				Repository: "github.com/az0/vpn_ip",
