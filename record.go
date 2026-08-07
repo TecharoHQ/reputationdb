@@ -34,7 +34,7 @@ type ListMembership struct {
 	Provider string `maxminddb:"provider"`
 	// Category is one of the Category* constants describing what kind of list
 	// this is.
-	Category string `maxminddb:"category"`
+	Category CategoryByte `maxminddb:"category"`
 }
 
 // Record is the high-level metadata stored for a single IP address (or CIDR
@@ -74,15 +74,18 @@ func (r *Record) sort() {
 // belongs to.
 func (r *Record) Categories() []string {
 	seen := map[string]bool{}
-	var out []string
+	var result []string
 	for _, s := range r.Sources {
-		if !seen[s.Category] {
-			seen[s.Category] = true
-			out = append(out, s.Category)
+		cats := s.Category.Strings()
+		for _, cat := range cats {
+			if !seen[cat] {
+				seen[cat] = true
+				result = append(result, cat)
+			}
 		}
 	}
-	sort.Strings(out)
-	return out
+	sort.Strings(result)
+	return result
 }
 
 // Providers returns the distinct, sorted set of providers this address belongs
@@ -137,7 +140,7 @@ func (r *Record) DataType() mmdbtype.DataType {
 			"repository": mmdbtype.String(s.Repository),
 			"list":       mmdbtype.String(s.List),
 			"provider":   mmdbtype.String(s.Provider),
-			"category":   mmdbtype.String(s.Category),
+			"category":   mmdbtype.String(s.Category.String()),
 		})
 	}
 

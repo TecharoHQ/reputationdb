@@ -69,7 +69,7 @@ func toRecord(ipAddress string, res reputationdb.Result) *reputationdbv1.Record 
 			Repository: s.Repository,
 			List:       s.List,
 			Provider:   s.Provider,
-			Category:   s.Category,
+			Category:   s.Category.String(),
 		})
 	}
 

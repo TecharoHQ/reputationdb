@@ -1788,7 +1788,7 @@ func collect(src repoSource, lists []listSpec, fsys fs.FS, store *bart.Table[*vp
 				Repository: src.name,
 				List:       file,
 				Provider:   provider,
-				Category:   ls.category,
+				Category:   vpnip.FromCategories([]string{ls.category}),
 			})
 		}
 	}
@@ -1816,7 +1816,7 @@ func collectHTTP(ctx context.Context, client *http.Client, src httpSource, cache
 				Repository: src.name,
 				List:       list,
 				Provider:   provider,
-				Category:   src.category,
+				Category:   vpnip.FromCategories([]string{src.category}),
 			})
 		}
 		return count, nil
@@ -1831,7 +1831,7 @@ func collectHTTP(ctx context.Context, client *http.Client, src httpSource, cache
 		Repository: src.name,
 		List:       list,
 		Provider:   src.provider,
-		Category:   src.category,
+		Category:   vpnip.FromCategories([]string{src.category}),
 	}), nil
 }
 
@@ -1873,7 +1873,7 @@ func collectFile(src fileSource, store *bart.Table[*vpnip.Record]) (int, error) 
 		Repository: src.name,
 		List:       path.Base(src.path),
 		Provider:   src.provider,
-		Category:   src.category,
+		Category:   vpnip.FromCategories([]string{src.category}),
 	}), nil
 }
 
@@ -1964,7 +1964,7 @@ func foldAS(store *bart.Table[*vpnip.Record], src asnSource, categories []string
 			Repository: "stat.ripe.net",
 			List:       list,
 			Provider:   src.provider,
-			Category:   category,
+			Category:   vpnip.FromCategories([]string{category}),
 		})
 	}
 	return count

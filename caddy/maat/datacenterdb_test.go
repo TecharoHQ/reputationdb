@@ -67,7 +67,7 @@ func testMatcher(t *testing.T, categories ...string) *Matcher {
 		Repository: "github.com/hexydec/ip-ranges",
 		List:       "output/datacentres.txt",
 		Provider:   "datacentres",
-		Category:   reputationdb.CategoryDatacenter,
+		Category:   reputationdb.CategoryByteDatacenter,
 	})
 
 	crawler := reputationdb.Record{}
@@ -75,7 +75,7 @@ func testMatcher(t *testing.T, categories ...string) *Matcher {
 		Repository: "github.com/hexydec/ip-ranges",
 		List:       "output/crawlers.txt",
 		Provider:   "crawlers",
-		Category:   reputationdb.CategoryCrawler,
+		Category:   reputationdb.CategoryByteCrawler,
 	})
 
 	db := buildDB(t, map[string]reputationdb.Record{

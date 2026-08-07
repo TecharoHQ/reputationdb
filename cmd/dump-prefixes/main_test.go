@@ -64,10 +64,10 @@ func record(t *testing.T, memberships ...reputationdb.ListMembership) reputation
 func testDB(t *testing.T) *reputationdb.DB {
 	t.Helper()
 
-	nordvpn := reputationdb.ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: reputationdb.CategoryVPN}
-	mullvad := reputationdb.ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "mullvad-ips.txt", Provider: "mullvad", Category: reputationdb.CategoryVPN}
-	datacentre := reputationdb.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: reputationdb.CategoryDatacenter}
-	crawlers := reputationdb.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: reputationdb.CategoryCrawler}
+	nordvpn := reputationdb.ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: reputationdb.CategoryByteVPN}
+	mullvad := reputationdb.ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "mullvad-ips.txt", Provider: "mullvad", Category: reputationdb.CategoryByteVPN}
+	datacentre := reputationdb.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: reputationdb.CategoryByteDatacenter}
+	crawlers := reputationdb.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: reputationdb.CategoryByteCrawler}
 
 	return buildDB(t, map[string]reputationdb.Record{
 		"1.2.3.4/32":     record(t, nordvpn),
@@ -175,7 +175,7 @@ func TestDumpWritesOnePrefixPerLine(t *testing.T) {
 	t.Parallel()
 
 	db := buildDB(t, map[string]reputationdb.Record{
-		"1.2.3.4/32": record(t, reputationdb.ListMembership{Repository: "r", List: "l", Provider: "p", Category: reputationdb.CategoryVPN}),
+		"1.2.3.4/32": record(t, reputationdb.ListMembership{Repository: "r", List: "l", Provider: "p", Category: reputationdb.CategoryByteVPN}),
 	})
 
 	var out bytes.Buffer

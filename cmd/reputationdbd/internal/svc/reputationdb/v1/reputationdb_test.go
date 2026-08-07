@@ -108,7 +108,7 @@ func TestToRecord(t *testing.T) {
 				Repository: "github.com/az0/vpn_ip",
 				List:       "data/input/ip/nordvpn.txt",
 				Provider:   "nordvpn",
-				Category:   "vpn",
+				Category:   reputationdb.CategoryByteVPN,
 			},
 		},
 	}

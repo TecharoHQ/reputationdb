@@ -1,0 +1,29 @@
+apiVersion: x.within.website/v1
+kind: App
+metadata:
+  name: reputationdbd-devel
+  namespace: techaro
+spec:
+  image: ghcr.io/techarohq/reputationdbd:latest
+  autoUpdate: true
+  replicas: 1
+  port: 3823
+  logLevel: info
+
+  # healthcheck:
+  #   enabled: true
+  #   kind: http
+  #   path: /api/healthz
+  #   port: 9080
+
+  ingress:
+    enabled: true
+    host: maat.probably-not-malware.lol
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
+
+  secrets:
+    - name: secrets
+      itemPath: "vaults/lc5zo4zjz3if3mkeuhufjmgmui/items/xk6zi35qqka6hbnqf3panqp36a"
+      environment: true

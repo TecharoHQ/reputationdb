@@ -50,11 +50,11 @@ func buildDB(t *testing.T, entries map[string]Record) *DB {
 
 func TestDBLookup(t *testing.T) {
 	vpnAndDC := Record{}
-	vpnAndDC.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryVPN})
-	vpnAndDC.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: CategoryDatacenter})
+	vpnAndDC.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryByteVPN})
+	vpnAndDC.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: CategoryByteVPN})
 
 	crawler := Record{}
-	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryCrawler})
+	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryByteCrawler})
 
 	db := buildDB(t, map[string]Record{
 		"1.2.3.4/32":     vpnAndDC,
@@ -106,10 +106,10 @@ func TestDBLookup(t *testing.T) {
 
 func TestDBNetworks(t *testing.T) {
 	vpn := Record{}
-	vpn.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryVPN})
+	vpn.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryByteVPN})
 
 	crawler := Record{}
-	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryCrawler})
+	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryByteCrawler})
 
 	db := buildDB(t, map[string]Record{
 		"1.2.3.4/32":     vpn,

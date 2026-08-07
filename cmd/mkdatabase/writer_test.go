@@ -38,15 +38,15 @@ func TestWriterRoundTrip(t *testing.T) {
 	}
 
 	vpnRec := vpnip.Record{}
-	vpnRec.Add(vpnip.ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: vpnip.CategoryVPN})
-	vpnRec.Add(vpnip.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: vpnip.CategoryDatacenter})
+	vpnRec.Add(vpnip.ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: vpnip.CategoryByteVPN})
+	vpnRec.Add(vpnip.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: vpnip.CategoryByteDatacenter})
 
 	if err := w.Insert(netip.MustParsePrefix("1.2.3.4/32"), vpnRec); err != nil {
 		t.Fatalf("Insert v4: %v", err)
 	}
 
 	crawlerRec := vpnip.Record{}
-	crawlerRec.Add(vpnip.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: vpnip.CategoryCrawler})
+	crawlerRec.Add(vpnip.ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: vpnip.CategoryByteCrawler})
 	if err := w.Insert(netip.MustParsePrefix("2606:4700::/32"), crawlerRec); err != nil {
 		t.Fatalf("Insert v6: %v", err)
 	}

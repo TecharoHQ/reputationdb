@@ -135,7 +135,7 @@ func TestCollectHTTP(t *testing.T) {
 		t.Fatalf("203.0.113.4/32: got %d sources, want 1 (deduped): %+v", len(rec.Sources), rec.Sources)
 	}
 	m := rec.Sources[0]
-	if m.Repository != "ipinsights.io" || m.List != "blocklist-cidr.txt" || m.Provider != "ipinsights" || m.Category != vpnip.CategoryAbuse {
+	if m.Repository != "ipinsights.io" || m.List != "blocklist-cidr.txt" || m.Provider != "ipinsights" || m.Category != vpnip.CategoryByteAbuse {
 		t.Errorf("membership = %+v, want repo/list/provider/category ipinsights.io/blocklist-cidr.txt/ipinsights/abuse", m)
 	}
 
@@ -189,7 +189,7 @@ func TestCollectFile(t *testing.T) {
 		t.Fatalf("203.0.113.4/32: got %d sources, want 1 (deduped): %+v", len(rec.Sources), rec.Sources)
 	}
 	m := rec.Sources[0]
-	if m.Repository != "fdo" || m.List != "ips.txt" || m.Provider != "fdo" || m.Category != vpnip.CategoryAbuse {
+	if m.Repository != "fdo" || m.List != "ips.txt" || m.Provider != "fdo" || m.Category != vpnip.CategoryByteAbuse {
 		t.Errorf("membership = %+v, want repo/list/provider/category fdo/ips.txt/fdo/abuse", m)
 	}
 
@@ -856,7 +856,7 @@ func TestCollectHTTPGrouped(t *testing.T) {
 		t.Fatalf("8.34.210.0/24: got %d sources, want 1: %+v", len(rec.Sources), rec.Sources)
 	}
 	m := rec.Sources[0]
-	if m.Provider != "googlecloud-us-central1" || m.List != "googlecloud_ips.json" || m.Category != vpnip.CategoryDatacenter {
+	if m.Provider != "googlecloud-us-central1" || m.List != "googlecloud_ips.json" || m.Category != vpnip.CategoryByteDatacenter {
 		t.Errorf("membership = %+v, want provider googlecloud-us-central1 / list googlecloud_ips.json / category datacenter", m)
 	}
 }
@@ -864,14 +864,14 @@ func TestCollectHTTPGrouped(t *testing.T) {
 func TestMergeContained(t *testing.T) {
 	store := &bart.Table[*vpnip.Record]{}
 	fold(store, []netip.Prefix{netip.MustParsePrefix("1.2.0.0/16")},
-		vpnip.ListMembership{Repository: "r16", List: "l16", Provider: "p16", Category: vpnip.CategoryAbuse})
+		vpnip.ListMembership{Repository: "r16", List: "l16", Provider: "p16", Category: vpnip.CategoryByteAbuse})
 	fold(store, []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
-		vpnip.ListMembership{Repository: "r24", List: "l24", Provider: "p24", Category: vpnip.CategoryAbuse})
+		vpnip.ListMembership{Repository: "r24", List: "l24", Provider: "p24", Category: vpnip.CategoryByteAbuse})
 	fold(store, []netip.Prefix{netip.MustParsePrefix("1.2.3.4/32")},
-		vpnip.ListMembership{Repository: "r32", List: "l32", Provider: "p32", Category: vpnip.CategoryVPN})
+		vpnip.ListMembership{Repository: "r32", List: "l32", Provider: "p32", Category: vpnip.CategoryByteVPN})
 	// 9.9.9.9/32 is covered by nothing and must stay untouched.
 	fold(store, []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")},
-		vpnip.ListMembership{Repository: "r9", List: "l9", Provider: "p9", Category: vpnip.CategoryAbuse})
+		vpnip.ListMembership{Repository: "r9", List: "l9", Provider: "p9", Category: vpnip.CategoryByteAbuse})
 
 	mergeContained(store)
 
