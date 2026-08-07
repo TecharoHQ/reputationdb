@@ -131,7 +131,7 @@ func CompressedDatabase(cidrs ...string) ([]byte, error) {
 			Repository: "github.com/hexydec/ip-ranges",
 			List:       "output/datacentres.txt",
 			Provider:   "datacentres",
-			Category:   reputationdb.CategoryDatacenter,
+			Category:   reputationdb.CategoryByteDatacenter,
 		})
 
 		_, network, err := net.ParseCIDR(cidr)

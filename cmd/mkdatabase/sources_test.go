@@ -135,7 +135,7 @@ func TestCollectHTTP(t *testing.T) {
 		t.Fatalf("203.0.113.4/32: got %d sources, want 1 (deduped): %+v", len(rec.Sources), rec.Sources)
 	}
 	m := rec.Sources[0]
-	if m.Repository != "ipinsights.io" || m.List != "blocklist-cidr.txt" || m.Provider != "ipinsights" || m.Category != vpnip.CategoryAbuse {
+	if m.Repository != "ipinsights.io" || m.List != "blocklist-cidr.txt" || m.Provider != "ipinsights" || m.Category != vpnip.CategoryByteAbuse {
 		t.Errorf("membership = %+v, want repo/list/provider/category ipinsights.io/blocklist-cidr.txt/ipinsights/abuse", m)
 	}
 
@@ -189,7 +189,7 @@ func TestCollectFile(t *testing.T) {
 		t.Fatalf("203.0.113.4/32: got %d sources, want 1 (deduped): %+v", len(rec.Sources), rec.Sources)
 	}
 	m := rec.Sources[0]
-	if m.Repository != "fdo" || m.List != "ips.txt" || m.Provider != "fdo" || m.Category != vpnip.CategoryAbuse {
+	if m.Repository != "fdo" || m.List != "ips.txt" || m.Provider != "fdo" || m.Category != vpnip.CategoryByteAbuse {
 		t.Errorf("membership = %+v, want repo/list/provider/category fdo/ips.txt/fdo/abuse", m)
 	}
 
@@ -856,7 +856,7 @@ func TestCollectHTTPGrouped(t *testing.T) {
 		t.Fatalf("8.34.210.0/24: got %d sources, want 1: %+v", len(rec.Sources), rec.Sources)
 	}
 	m := rec.Sources[0]
-	if m.Provider != "googlecloud-us-central1" || m.List != "googlecloud_ips.json" || m.Category != vpnip.CategoryDatacenter {
+	if m.Provider != "googlecloud-us-central1" || m.List != "googlecloud_ips.json" || m.Category != vpnip.CategoryByteDatacenter {
 		t.Errorf("membership = %+v, want provider googlecloud-us-central1 / list googlecloud_ips.json / category datacenter", m)
 	}
 }
@@ -864,14 +864,14 @@ func TestCollectHTTPGrouped(t *testing.T) {
 func TestMergeContained(t *testing.T) {
 	store := &bart.Table[*vpnip.Record]{}
 	fold(store, []netip.Prefix{netip.MustParsePrefix("1.2.0.0/16")},
-		vpnip.ListMembership{Repository: "r16", List: "l16", Provider: "p16", Category: vpnip.CategoryAbuse})
+		vpnip.ListMembership{Repository: "r16", List: "l16", Provider: "p16", Category: vpnip.CategoryByteAbuse})
 	fold(store, []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")},
-		vpnip.ListMembership{Repository: "r24", List: "l24", Provider: "p24", Category: vpnip.CategoryAbuse})
+		vpnip.ListMembership{Repository: "r24", List: "l24", Provider: "p24", Category: vpnip.CategoryByteAbuse})
 	fold(store, []netip.Prefix{netip.MustParsePrefix("1.2.3.4/32")},
-		vpnip.ListMembership{Repository: "r32", List: "l32", Provider: "p32", Category: vpnip.CategoryVPN})
+		vpnip.ListMembership{Repository: "r32", List: "l32", Provider: "p32", Category: vpnip.CategoryByteVPN})
 	// 9.9.9.9/32 is covered by nothing and must stay untouched.
 	fold(store, []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")},
-		vpnip.ListMembership{Repository: "r9", List: "l9", Provider: "p9", Category: vpnip.CategoryAbuse})
+		vpnip.ListMembership{Repository: "r9", List: "l9", Provider: "p9", Category: vpnip.CategoryByteAbuse})
 
 	mergeContained(store)
 
@@ -880,8 +880,8 @@ func TestMergeContained(t *testing.T) {
 	if len(rec.Sources) != 3 {
 		t.Fatalf("/32 sources = %d, want 3: %+v", len(rec.Sources), rec.Sources)
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryAbuse || cats[1] != vpnip.CategoryVPN {
-		t.Errorf("/32 categories = %v, want [abuse vpn]", cats)
+	if want := vpnip.CategoryByteAbuse | vpnip.CategoryByteVPN; rec.Categories() != want {
+		t.Errorf("/32 categories = %v, want %v", rec.Categories(), want)
 	}
 
 	// /24 inherits only the /16; it must NOT gain the narrower /32's membership.
@@ -985,8 +985,8 @@ func TestFoldAS(t *testing.T) {
 			t.Errorf("membership = %+v, want repo stat.ripe.net / list AS136907 / provider huawei-cloud", m)
 		}
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryAbuse || cats[1] != vpnip.CategoryDatacenter {
-		t.Errorf("categories = %v, want [abuse datacenter]", cats)
+	if want := vpnip.CategoryByteAbuse | vpnip.CategoryByteDatacenter; rec.Categories() != want {
+		t.Errorf("categories = %v, want %v", rec.Categories(), want)
 	}
 }
 
@@ -1019,8 +1019,8 @@ func TestCollectASCache(t *testing.T) {
 	if rec == nil {
 		t.Fatal("expected record for 1.2.3.0/24 from cache")
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryAbuse || cats[1] != vpnip.CategoryDatacenter {
-		t.Errorf("categories = %v, want [abuse datacenter]", cats)
+	if want := vpnip.CategoryByteAbuse | vpnip.CategoryByteDatacenter; rec.Categories() != want {
+		t.Errorf("categories = %v, want %v", rec.Categories(), want)
 	}
 
 	// A stale cache (aged past cacheMaxAge) must not be served; with no network
@@ -1068,8 +1068,8 @@ func TestCollect(t *testing.T) {
 	if len(rec.Sources) != 2 {
 		t.Fatalf("1.2.3.4/32: got %d sources, want 2: %+v", len(rec.Sources), rec.Sources)
 	}
-	if cats := rec.Categories(); len(cats) != 2 || cats[0] != vpnip.CategoryDatacenter || cats[1] != vpnip.CategoryVPN {
-		t.Errorf("1.2.3.4/32 categories = %v, want [datacenter vpn]", cats)
+	if want := vpnip.CategoryByteDatacenter | vpnip.CategoryByteVPN; rec.Categories() != want {
+		t.Errorf("1.2.3.4/32 categories = %v, want %v", rec.Categories(), want)
 	}
 
 	// 5.6.7.8/32 appears on two vpn providers; providers should be deduped/sorted.
@@ -1079,5 +1079,59 @@ func TestCollect(t *testing.T) {
 	}
 	if provs := rec.Providers(); len(provs) != 2 || provs[0] != "nordvpn" || provs[1] != "protonvpn" {
 		t.Errorf("5.6.7.8/32 providers = %v, want [nordvpn protonvpn]", provs)
+	}
+}
+
+func TestCollapseV6(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "an IPv6 host becomes its /64", input: "2606:4700:4700::1111/128", want: "2606:4700:4700::/64"},
+		{name: "a /64 is left alone", input: "2606:4700:4700::/64", want: "2606:4700:4700::/64"},
+		{name: "a prefix shorter than /64 is left alone", input: "2606:4700::/32", want: "2606:4700::/32"},
+		{name: "a prefix between /64 and /128 collapses too", input: "2606:4700:4700:1234:5678::/80", want: "2606:4700:4700:1234::/64"},
+		{name: "an IPv4 host is left alone", input: "1.2.3.4/32", want: "1.2.3.4/32"},
+		{name: "an IPv4 range is left alone", input: "9.9.9.0/24", want: "9.9.9.0/24"},
+		{name: "an IPv4-mapped host is left alone", input: "::ffff:1.2.3.4/128", want: "::ffff:1.2.3.4/128"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := collapseV6(netip.MustParsePrefix(tt.input))
+			if want := netip.MustParsePrefix(tt.want); got != want {
+				t.Logf("want: %v", want)
+				t.Logf(" got: %v", got)
+				t.Error("collapseV6 returned the wrong prefix")
+			}
+		})
+	}
+}
+
+// Two addresses in one /64 must land on one record carrying both memberships,
+// rather than two records that each know half the story.
+func TestFoldCollapsesV6HostsTogether(t *testing.T) {
+	store := &bart.Table[*vpnip.Record]{}
+
+	fold(store, []netip.Prefix{netip.MustParsePrefix("2606:4700:4700::1111/128")}, vpnip.ListMembership{
+		Repository: "example.com", List: "a.txt", Provider: "a", Category: vpnip.CategoryByteVPN,
+	})
+	fold(store, []netip.Prefix{netip.MustParsePrefix("2606:4700:4700::8888/128")}, vpnip.ListMembership{
+		Repository: "example.com", List: "b.txt", Provider: "b", Category: vpnip.CategoryByteAbuse,
+	})
+
+	if got := store.Size(); got != 1 {
+		t.Fatalf("store holds %d prefixes, want 1: both hosts are in one /64", got)
+	}
+	rec, ok := store.Get(netip.MustParsePrefix("2606:4700:4700::/64"))
+	if !ok {
+		t.Fatal("no record at 2606:4700:4700::/64")
+	}
+	if len(rec.Sources) != 2 {
+		t.Errorf("sources = %d, want 2: %+v", len(rec.Sources), rec.Sources)
+	}
+	if want := vpnip.CategoryByteVPN | vpnip.CategoryByteAbuse; rec.Categories() != want {
+		t.Errorf("categories = %v, want %v", rec.Categories(), want)
 	}
 }

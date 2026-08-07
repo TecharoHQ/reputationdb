@@ -62,6 +62,11 @@ func parseAddrs(raw []string) (addrs []netip.Addr, inputs map[netip.Addr]string,
 //
 // ipAddress is the string the client asked about, not addr.String(): see
 // parseAddrs.
+//
+// The database stores categories as a bitmask. The wire format keeps the
+// booleans and the names, because a client reads them directly. A client also
+// holds one record at a time, so it does not pay the memory cost that the
+// bitmask removes. This function is where the two forms meet.
 func toRecord(ipAddress string, res reputationdb.Result) *reputationdbv1.Record {
 	sources := make([]*reputationdbv1.ListMembership, 0, len(res.Sources))
 	for _, s := range res.Sources {
@@ -69,18 +74,18 @@ func toRecord(ipAddress string, res reputationdb.Result) *reputationdbv1.Record 
 			Repository: s.Repository,
 			List:       s.List,
 			Provider:   s.Provider,
-			Category:   s.Category,
+			Category:   s.Category.String(),
 		})
 	}
 
 	return &reputationdbv1.Record{
 		IpAddress:    ipAddress,
-		IsVpn:        res.IsVPN,
-		IsDatacenter: res.IsDatacenter,
-		IsCrawler:    res.IsCrawler,
-		IsProxy:      res.IsProxy,
-		Categories:   res.Categories,
-		Providers:    res.Providers,
+		IsVpn:        res.Categories.Has(reputationdb.CategoryByteVPN),
+		IsDatacenter: res.Categories.Has(reputationdb.CategoryByteDatacenter),
+		IsCrawler:    res.Categories.Has(reputationdb.CategoryByteCrawler),
+		IsProxy:      res.Categories.Has(reputationdb.CategoryByteProxy),
+		Categories:   res.Categories.Strings(),
+		Providers:    res.Providers(),
 		Sources:      sources,
 	}
 }

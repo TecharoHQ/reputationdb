@@ -97,18 +97,19 @@ func TestParseAddrsEchoesTheRequestedForm(t *testing.T) {
 
 func TestToRecord(t *testing.T) {
 	res := reputationdb.Result{
-		IsVPN:        true,
-		IsDatacenter: true,
-		IsCrawler:    false,
-		IsProxy:      false,
-		Categories:   []string{"datacenter", "vpn"},
-		Providers:    []string{"datacentres", "nordvpn"},
+		Categories: reputationdb.CategoryByteVPN | reputationdb.CategoryByteDatacenter,
 		Sources: []reputationdb.ListMembership{
 			{
 				Repository: "github.com/az0/vpn_ip",
 				List:       "data/input/ip/nordvpn.txt",
 				Provider:   "nordvpn",
-				Category:   "vpn",
+				Category:   reputationdb.CategoryByteVPN,
+			},
+			{
+				Repository: "github.com/hexydec/ip-ranges",
+				List:       "output/datacentres.txt",
+				Provider:   "datacentres",
+				Category:   reputationdb.CategoryByteDatacenter,
 			},
 		},
 	}
@@ -132,8 +133,8 @@ func TestToRecord(t *testing.T) {
 	}
 
 	sources := got.GetSources()
-	if len(sources) != 1 {
-		t.Fatalf("Sources = %v, want one entry", sources)
+	if len(sources) != 2 {
+		t.Fatalf("Sources = %v, want two entries", sources)
 	}
 	if sources[0].GetRepository() != "github.com/az0/vpn_ip" {
 		t.Errorf("Sources[0].Repository = %q, want %q", sources[0].GetRepository(), "github.com/az0/vpn_ip")

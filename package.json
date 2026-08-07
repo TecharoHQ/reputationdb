@@ -19,14 +19,15 @@
     "generate": "npm run generate:buf && npm run generate:go && npm run format",
     "generate:buf": "buf generate",
     "generate:go": "go generate ./...",
-    "lint": "npm run lint:vet && npm run lint:staticcheck",
+    "lint": "npm run lint:buf && npm run lint:vet && npm run lint:staticcheck",
+    "lint:buf": "buf lint",
     "lint:staticcheck": "go tool staticcheck ./...",
     "lint:vet": "go vet ./...",
-    "test": "go test ./...",
+    "test": "npm run generate && go test ./...",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@bufbuild/buf": "^1.71.0",
+    "@bufbuild/buf": "^1.72.0",
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
     "husky": "^9.1.7",

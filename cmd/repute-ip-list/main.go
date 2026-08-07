@@ -163,22 +163,22 @@ func run(mmdbPath, listPath string) error {
 		}
 		s.found++
 
-		if res.IsVPN {
+		if res.Categories.Has(reputationdb.CategoryByteVPN) {
 			s.isVPN++
 		}
-		if res.IsDatacenter {
+		if res.Categories.Has(reputationdb.CategoryByteDatacenter) {
 			s.isDatacenter++
 		}
-		if res.IsCrawler {
+		if res.Categories.Has(reputationdb.CategoryByteCrawler) {
 			s.isCrawler++
 		}
-		if res.IsProxy {
+		if res.Categories.Has(reputationdb.CategoryByteProxy) {
 			s.isProxy++
 		}
-		for _, cat := range res.Categories {
+		for _, cat := range res.Categories.Strings() {
 			s.categories[cat]++
 		}
-		for _, prov := range res.Providers {
+		for _, prov := range res.Providers() {
 			s.providers[prov]++
 		}
 	}

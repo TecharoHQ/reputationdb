@@ -78,7 +78,9 @@ var knownCategories = []string{
 // families: -category vpn -category tor writes records on either list, while
 // -category vpn -provider mullvad writes only records on both.
 type filter struct {
-	categories []string
+	// categories is the -category values in the bitmask form that the database
+	// stores. A record then costs one AND instead of a walk over both slices.
+	categories reputationdb.CategoryByte
 	providers  []string
 }
 
@@ -94,16 +96,16 @@ func parseFilter(categories, providers []string) (filter, error) {
 			return filter{}, fmt.Errorf("unknown category %q: valid categories are %s", c, strings.Join(knownCategories, ", "))
 		}
 	}
-	return filter{categories: categories, providers: providers}, nil
+	return filter{categories: reputationdb.FromCategories(categories), providers: providers}, nil
 }
 
 // empty reports whether the filter selects everything, in which case no record
 // needs to be decoded to decide.
-func (f filter) empty() bool { return len(f.categories) == 0 && len(f.providers) == 0 }
+func (f filter) empty() bool { return f.categories == 0 && len(f.providers) == 0 }
 
 // match reports whether res satisfies every family of values in the filter.
 func (f filter) match(res *reputationdb.Result) bool {
-	if len(f.categories) != 0 && !slices.ContainsFunc(f.categories, res.HasCategory) {
+	if f.categories != 0 && !res.Categories.Has(f.categories) {
 		return false
 	}
 	if len(f.providers) != 0 && !slices.ContainsFunc(f.providers, res.HasProvider) {

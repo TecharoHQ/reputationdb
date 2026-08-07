@@ -67,7 +67,7 @@ func testMatcher(t *testing.T, categories ...string) *Matcher {
 		Repository: "github.com/hexydec/ip-ranges",
 		List:       "output/datacentres.txt",
 		Provider:   "datacentres",
-		Category:   reputationdb.CategoryDatacenter,
+		Category:   reputationdb.CategoryByteDatacenter,
 	})
 
 	crawler := reputationdb.Record{}
@@ -75,7 +75,7 @@ func testMatcher(t *testing.T, categories ...string) *Matcher {
 		Repository: "github.com/hexydec/ip-ranges",
 		List:       "output/crawlers.txt",
 		Provider:   "crawlers",
-		Category:   reputationdb.CategoryCrawler,
+		Category:   reputationdb.CategoryByteCrawler,
 	})
 
 	db := buildDB(t, map[string]reputationdb.Record{
@@ -83,8 +83,12 @@ func testMatcher(t *testing.T, categories ...string) *Matcher {
 		"2606:4700::/32": crawler,
 	})
 
+	// MatchWithError reads cats, not Categories. Provision normally sets cats
+	// from Categories. This helper does not run Provision, so it sets cats the
+	// same way.
 	return &Matcher{
 		Categories: categories,
+		cats:       reputationdb.FromCategories(categories),
 		logger:     zap.NewNop(),
 		store:      &dbStore{db: db},
 	}

@@ -376,11 +376,11 @@ var File_techaro_lol_reputationdb_fetch_v1_fetch_proto protoreflect.FileDescript
 
 const file_techaro_lol_reputationdb_fetch_v1_fetch_proto_rawDesc = "" +
 	"\n" +
-	"-techaro/lol/reputationdb/fetch/v1/fetch.proto\x12!techaro.lol.reputationdb.fetch.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf2\x01\n" +
-	"\fFetchRequest\x12}\n" +
+	"-techaro/lol/reputationdb/fetch/v1/fetch.proto\x12!techaro.lol.reputationdb.fetch.v1\x1a\x1bbuf/validate/validate.proto\x1a$gnostic/openapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/api/visibility.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf9\x01\n" +
+	"\fFetchRequest\x12\x83\x01\n" +
 	"\n" +
-	"version_id\x18\x01 \x01(\tB^\xbaG[J\n" +
-	"Version ID\x92\x02LThe version ID of the database to download, as returned by the list endpointR\tversionId:c\xbaGRJ\rFetch Request\x92\x02@A request for a download URL for one published database version.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xb5\x06\n" +
+	"version_id\x18\x01 \x01(\tBd\xbaG[J\n" +
+	"Version ID\x92\x02LThe version ID of the database to download, as returned by the list endpoint\xbaH\x03\xc8\x01\x01R\tversionId:c\xbaGRJ\rFetch Request\x92\x02@A request for a download URL for one published database version.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xb5\x06\n" +
 	"\x0fDatabaseVersion\x12t\n" +
 	"\n" +
 	"created_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB9\xbaG6J\n" +
@@ -394,11 +394,11 @@ const file_techaro_lol_reputationdb_fetch_v1_fetch_proto_rawDesc = "" +
 	"\rFetchResponse\x12\x91\x01\n" +
 	"\aversion\x18\x01 \x01(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionBC\xbaG@J\aVersion\x92\x024Metadata about the database version being downloadedR\aversion\x12\xb3\x01\n" +
 	"\rpresigned_url\x18\x02 \x01(\tB\x8d\x01\xbaG\x89\x01J\rPresigned URL\x92\x02wA presigned GET URL for the zstd-compressed database. It expires, so fetch it again rather than caching the URL itself.R\fpresignedUrl\x12\x93\x01\n" +
-	"\blifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\\\xbaGYJ\bLifetime\x92\x02LHow long the client should wait before checking for a newer database versionR\blifetime:\x9e\x01\xbaG\x8c\x01J\x0eFetch Response\x92\x02yA time-limited download URL for a database version, plus how long the client should wait before checking for a newer one.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\x84\x02\n" +
-	"\vInfoRequest\x12}\n" +
+	"\blifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\\\xbaGYJ\bLifetime\x92\x02LHow long the client should wait before checking for a newer database versionR\blifetime:\x9e\x01\xbaG\x8c\x01J\x0eFetch Response\x92\x02yA time-limited download URL for a database version, plus how long the client should wait before checking for a newer one.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\x8b\x02\n" +
+	"\vInfoRequest\x12\x83\x01\n" +
 	"\n" +
-	"version_id\x18\x01 \x01(\tB^\xbaG[J\n" +
-	"Version ID\x92\x02LThe version ID of the database to describe, as returned by the list endpointR\tversionId:v\xbaGeJ\fInfo Request\x92\x02TA request for metadata about one published database version, without a download URL.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xee\x01\n" +
+	"version_id\x18\x01 \x01(\tBd\xbaG[J\n" +
+	"Version ID\x92\x02LThe version ID of the database to describe, as returned by the list endpoint\xbaH\x03\xc8\x01\x01R\tversionId:v\xbaGeJ\fInfo Request\x92\x02TA request for metadata about one published database version, without a download URL.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xee\x01\n" +
 	"\fInfoResponse\x12\x8a\x01\n" +
 	"\aversion\x18\x01 \x01(\v22.techaro.lol.reputationdb.fetch.v1.DatabaseVersionB<\xbaG9J\aVersion\x92\x02-Metadata about the requested database versionR\aversion:Q\xbaG@J\rInfo Response\x92\x02.Metadata about one published database version.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\x88\x01\n" +
 	"\vListRequest:y\xbaGhJ\fList Request\x92\x02WA request for every database version the server currently retains. Takes no parameters.\xfa\xd2\xe4\x93\x02\b\x12\x06PUBLIC\"\xa0\x02\n" +

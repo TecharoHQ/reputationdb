@@ -102,6 +102,10 @@ type Matcher struct {
 	// don't want to download it again on every start.
 	StoragePath string `json:"storage_path,omitempty"`
 
+	// cats is Categories in the bitmask form that the database stores. Provision
+	// sets it once, so a request costs one AND instead of a walk over two string
+	// slices.
+	cats   reputationdb.CategoryByte
 	key    storeKey
 	store  *dbStore
 	logger *zap.Logger
@@ -141,6 +145,7 @@ func (m *Matcher) Provision(ctx caddy.Context) error {
 	}
 	slices.Sort(m.Categories)
 	m.Categories = slices.Compact(m.Categories)
+	m.cats = reputationdb.FromCategories(m.Categories)
 
 	m.APIKey = repl.ReplaceAll(m.APIKey, "")
 	m.key = storeKey{server: m.Server, tier: m.tier()}
@@ -219,10 +224,12 @@ func (m *Matcher) MatchWithError(r *http.Request) (bool, error) {
 		return false, nil
 	}
 
-	if len(m.Categories) == 0 {
+	// An empty category list means "anything in the database". This address is
+	// in the database.
+	if m.cats == 0 {
 		return true, nil
 	}
-	return slices.ContainsFunc(m.Categories, result.HasCategory), nil
+	return result.Categories.Has(m.cats), nil
 }
 
 // Match implements the deprecated caddyhttp.RequestMatcher interface, kept for

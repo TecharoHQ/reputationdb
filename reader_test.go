@@ -50,11 +50,11 @@ func buildDB(t *testing.T, entries map[string]Record) *DB {
 
 func TestDBLookup(t *testing.T) {
 	vpnAndDC := Record{}
-	vpnAndDC.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryVPN})
-	vpnAndDC.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: CategoryDatacenter})
+	vpnAndDC.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryByteVPN})
+	vpnAndDC.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/datacentres.txt", Provider: "datacentres", Category: CategoryByteDatacenter})
 
 	crawler := Record{}
-	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryCrawler})
+	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryByteCrawler})
 
 	db := buildDB(t, map[string]Record{
 		"1.2.3.4/32":     vpnAndDC,
@@ -69,11 +69,13 @@ func TestDBLookup(t *testing.T) {
 		if !found {
 			t.Fatal("expected 1.2.3.4 to be found")
 		}
-		if !got.IsVPN || !got.IsDatacenter || got.IsCrawler {
-			t.Errorf("flags vpn=%v dc=%v crawler=%v, want true,true,false", got.IsVPN, got.IsDatacenter, got.IsCrawler)
+		if want := CategoryByteVPN | CategoryByteDatacenter; got.Categories != want {
+			t.Logf("want: %v", want)
+			t.Logf(" got: %v", got.Categories)
+			t.Error("1.2.3.4 has the wrong categories")
 		}
-		if !got.HasProvider("nordvpn") || !got.HasCategory(CategoryDatacenter) {
-			t.Errorf("missing expected provider/category: %+v", got)
+		if !got.HasProvider("nordvpn") {
+			t.Errorf("missing expected provider: %+v", got)
 		}
 		if len(got.Sources) != 2 {
 			t.Errorf("sources = %d, want 2: %+v", len(got.Sources), got.Sources)
@@ -88,8 +90,10 @@ func TestDBLookup(t *testing.T) {
 		if !found {
 			t.Fatal("expected 2606:4700::1 to be found")
 		}
-		if got.IsVPN || got.IsDatacenter || !got.IsCrawler {
-			t.Errorf("flags vpn=%v dc=%v crawler=%v, want false,false,true", got.IsVPN, got.IsDatacenter, got.IsCrawler)
+		if got.Categories != CategoryByteCrawler {
+			t.Logf("want: %v", CategoryByteCrawler)
+			t.Logf(" got: %v", got.Categories)
+			t.Error("2606:4700::1 has the wrong categories")
 		}
 	})
 
@@ -106,10 +110,10 @@ func TestDBLookup(t *testing.T) {
 
 func TestDBNetworks(t *testing.T) {
 	vpn := Record{}
-	vpn.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryVPN})
+	vpn.Add(ListMembership{Repository: "github.com/coocoobau/vpn-ip-lists", List: "nordvpn-ips.txt", Provider: "nordvpn", Category: CategoryByteVPN})
 
 	crawler := Record{}
-	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryCrawler})
+	crawler.Add(ListMembership{Repository: "github.com/hexydec/ip-ranges", List: "output/crawlers.txt", Provider: "crawlers", Category: CategoryByteCrawler})
 
 	db := buildDB(t, map[string]Record{
 		"1.2.3.4/32":     vpn,
@@ -146,10 +150,10 @@ func TestDBNetworks(t *testing.T) {
 		t.Fatal("got wrong set of prefixes")
 	}
 
-	if res := got["1.2.3.4/32"]; !res.IsVPN || !res.HasProvider("nordvpn") {
+	if res := got["1.2.3.4/32"]; !res.Categories.Has(CategoryByteVPN) || !res.HasProvider("nordvpn") {
 		t.Errorf("record at 1.2.3.4/32 did not decode: %+v", res)
 	}
-	if res := got["2606:4700::/32"]; !res.IsCrawler {
+	if res := got["2606:4700::/32"]; !res.Categories.Has(CategoryByteCrawler) {
 		t.Errorf("record at 2606:4700::/32 did not decode: %+v", res)
 	}
 }
