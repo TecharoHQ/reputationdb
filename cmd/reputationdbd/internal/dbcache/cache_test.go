@@ -379,6 +379,22 @@ func TestCacheRefreshFailures(t *testing.T) {
 			if _, _, loaded, _ := c.Query(nil); loaded {
 				t.Error("Query() loaded = true after a failed refresh, want false")
 			}
+
+			// New starts a background refresh of its own, and Refresh above
+			// only serializes against it rather than waiting for it. If the
+			// call above wins the lock, the background attempt is still
+			// between os.CreateTemp and its deferred os.Remove when the count
+			// below runs, and it sees a live reputationdb-*.mmdb.tmp staging
+			// file. That file is legitimate while a download is in flight, so
+			// the residue check is only meaningful once nothing is refreshing.
+			//
+			// Close is safe to call twice; newCache calls it again on cleanup.
+			// It has to happen after the Query check above, because it drops
+			// the mapped database and would make that assertion vacuous.
+			if err := c.Close(); err != nil {
+				t.Fatalf("Close() error = %v", err)
+			}
+
 			if got := countCacheFiles(t, dir); got != 1 {
 				t.Errorf("the cache directory holds %d files after a failed refresh, want 1 (the sentinel alone)", got)
 			}
