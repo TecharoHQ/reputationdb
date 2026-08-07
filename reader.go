@@ -21,15 +21,37 @@ type Result struct {
 	// with [FromCategories]. One call to [CategoryByte.Strings] for each result
 	// is much slower, because each call allocates.
 	Categories CategoryByte `maxminddb:"categories"`
-	// Providers is the distinct, sorted set of providers the address belongs to.
-	Providers []string `maxminddb:"providers"`
-	// Sources lists every upstream list/file the address was found on.
+	// Sources lists every upstream list/file the address was found on. The
+	// provider names live here and nowhere else, so [Result.HasProvider] and
+	// [Result.Providers] read them from this slice.
 	Sources []ListMembership `maxminddb:"sources"`
 }
 
 // HasProvider reports whether the result includes the named provider.
+//
+// This walks the sources. An address is on a handful of lists at most, so the
+// walk is cheaper than the array of names that the database would otherwise
+// carry on every record.
 func (r *Result) HasProvider(name string) bool {
-	return slices.Contains(r.Providers, name)
+	return slices.ContainsFunc(r.Sources, func(s ListMembership) bool {
+		return s.Provider == name
+	})
+}
+
+// Providers returns the distinct, sorted set of providers for this address.
+//
+// Each call allocates, so this belongs at the edges of the system, next to
+// [CategoryByte.Strings]. Code that looks for one provider must use
+// [Result.HasProvider] instead.
+func (r *Result) Providers() []string {
+	out := make([]string, 0, len(r.Sources))
+	for _, s := range r.Sources {
+		if !slices.Contains(out, s.Provider) {
+			out = append(out, s.Provider)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // DB is a read-only handle to a vpnip mmdb database.

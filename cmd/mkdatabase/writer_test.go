@@ -17,7 +17,6 @@ import (
 // the schema must then edit both types, so this test sees every change.
 type decoded struct {
 	Categories vpnip.CategoryByte `maxminddb:"categories"`
-	Providers  []string           `maxminddb:"providers"`
 	Sources    []struct {
 		Repository string             `maxminddb:"repository"`
 		List       string             `maxminddb:"list"`

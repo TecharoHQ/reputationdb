@@ -85,7 +85,7 @@ func toRecord(ipAddress string, res reputationdb.Result) *reputationdbv1.Record 
 		IsCrawler:    res.Categories.Has(reputationdb.CategoryByteCrawler),
 		IsProxy:      res.Categories.Has(reputationdb.CategoryByteProxy),
 		Categories:   res.Categories.Strings(),
-		Providers:    res.Providers,
+		Providers:    res.Providers(),
 		Sources:      sources,
 	}
 }

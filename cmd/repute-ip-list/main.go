@@ -178,7 +178,7 @@ func run(mmdbPath, listPath string) error {
 		for _, cat := range res.Categories.Strings() {
 			s.categories[cat]++
 		}
-		for _, prov := range res.Providers {
+		for _, prov := range res.Providers() {
 			s.providers[prov]++
 		}
 	}

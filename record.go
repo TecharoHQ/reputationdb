@@ -102,7 +102,6 @@ func (r *Record) Providers() []string {
 //
 //	{
 //	  "categories": uint16,
-//	  "providers":  []string,
 //	  "sources":    [{repository, list, provider, category}, ...]
 //	}
 //
@@ -111,14 +110,13 @@ func (r *Record) Providers() []string {
 //
 // The top-level mask is the union of the masks of the sources. A caller that
 // only needs to know what an address is does not have to read the sources.
+//
+// There is no top-level providers list. Every provider name is already on a
+// source, and the writer stores each distinct source once for the whole
+// database. A second list of the same names costs one array for each record,
+// which no amount of deduplication removes.
 func (r *Record) DataType() mmdbtype.DataType {
 	r.sort()
-
-	providers := r.Providers()
-	provSlice := make(mmdbtype.Slice, 0, len(providers))
-	for _, p := range providers {
-		provSlice = append(provSlice, mmdbtype.String(p))
-	}
 
 	sources := make(mmdbtype.Slice, 0, len(r.Sources))
 	for _, s := range r.Sources {
@@ -132,7 +130,6 @@ func (r *Record) DataType() mmdbtype.DataType {
 
 	return mmdbtype.Map{
 		"categories": mmdbtype.Uint16(r.Categories()),
-		"providers":  provSlice,
 		"sources":    sources,
 	}
 }
