@@ -2128,10 +2128,38 @@ func mergeContained(store *bart.Table[*vpnip.Record]) {
 	}
 }
 
+// v6HostBits is the longest IPv6 prefix the database stores. A /64 is the
+// smallest subnet a site normally receives, so one listed address stands for
+// the whole subnet around it.
+const v6HostBits = 64
+
+// collapseV6 shortens an IPv6 prefix longer than a /64 to the /64 that contains
+// it. IPv4 prefixes pass through unchanged, including the IPv4-mapped form.
+//
+// This trades accuracy for size, and the size is the reason. A single IPv6
+// address sits up to 128 levels deep in the search tree, and 72% of the IPv6
+// entries are /128s, so those hosts cost far more tree than the IPv4 half of
+// the database costs in total. Collapsing them also merges every listed address
+// in one subnet into a single record.
+//
+// The cost is false positives: a whole /64 is reported for one bad address in
+// it. That matches how the upstream lists mean the data, because the operator
+// who controls one address in a /64 controls all of them.
+func collapseV6(prefix netip.Prefix) netip.Prefix {
+	if prefix.Addr().Unmap().Is4() || prefix.Bits() <= v6HostBits {
+		return prefix
+	}
+	return netip.PrefixFrom(prefix.Addr(), v6HostBits).Masked()
+}
+
 // fold inserts each prefix into the store, attaching membership to new and
 // existing records alike, and returns the number of prefixes processed.
+//
+// Every prefix in the database enters through here, so this is where
+// [collapseV6] applies.
 func fold(store *bart.Table[*vpnip.Record], prefixes []netip.Prefix, m vpnip.ListMembership) int {
 	for _, prefix := range prefixes {
+		prefix = collapseV6(prefix)
 		rec, ok := store.Get(prefix)
 		if !ok {
 			rec = &vpnip.Record{}
