@@ -12,7 +12,23 @@ import (
 
 	fetchv1 "github.com/TecharoHQ/reputationdb/gen/techaro/lol/reputationdb/fetch/v1"
 	simplestorage "github.com/tigrisdata/storage-go/simplestorage"
+	"github.com/tigrisdata/storage-go/tigrisheaders"
 )
+
+// noCache marks an object as one that must never be served from a cache.
+//
+// Database objects are content-addressed, so a cached copy of one is always the
+// copy that was asked for and caching them is free. IndexKey is the single
+// mutable key in the bucket: it is overwritten in place on every publish, and
+// nothing about its name changes when its contents do. A reader served a cached
+// copy therefore resolves a superseded build and has no way to tell.
+//
+// That is not hypothetical. On 2026-08-07 a published index was overwritten at
+// 17:04:22Z and reputationdbd kept resolving the previous generation for over
+// twenty minutes, pinning itself to a database whose record schema its own
+// binary could no longer decode. simplestorage exposes no Cache-Control field
+// on Object, so the header goes on as a raw S3 request header.
+var noCache = simplestorage.WithS3Options(tigrisheaders.WithHeader("Cache-Control", "no-cache"))
 
 // Store is the slice of simplestorage.Client this repository needs, so that
 // tests can substitute an in-memory fake. *simplestorage.Client satisfies it.
@@ -99,7 +115,7 @@ func SaveIndex(ctx context.Context, store Store, idx *fetchv1.ListResponse) erro
 		ContentType: "application/octet-stream",
 		Size:        int64(len(body)),
 		Body:        readSeekNopCloser{bytes.NewReader(body)},
-	}, simplestorage.WithAccessType(simplestorage.AccessPrivate)); err != nil {
+	}, simplestorage.WithAccessType(simplestorage.AccessPrivate), noCache); err != nil {
 		return fmt.Errorf("putting %s: %w", IndexKey, err)
 	}
 
