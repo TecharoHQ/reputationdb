@@ -284,6 +284,15 @@ var httpSources = []httpSource{
 		parse:    parseCSVFirstField,
 	},
 	{
+		// The Tor Project's own list of the addresses its exit relays egress
+		// from, which is authoritative for the tor category.
+		name:     "check.torproject.org",
+		url:      "https://check.torproject.org/exit-addresses",
+		provider: "tor",
+		category: vpnip.CategoryTor,
+		parse:    parseTorExitAddresses,
+	},
+	{
 		// Ported from JasonLovesDoggo/caddy-defender's ranges/fetchers/tor.go.
 		name:     "github.com/alireza-rezaee/tor-nodes",
 		url:      "https://cdn.jsdelivr.net/gh/alireza-rezaee/tor-nodes@main/latest.exits.csv",
@@ -1306,6 +1315,34 @@ func parseRBLDNSD(data []byte) []netip.Prefix {
 		if i := strings.IndexAny(line, " \t"); i >= 0 {
 			field = line[:i]
 		}
+		if p, ok := parsePrefixField(field); ok {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// parseTorExitAddresses parses the Tor Project's exit-addresses file, a record
+// per exit relay where only the ExitAddress lines carry the address the relay
+// actually exits from:
+//
+//	ExitNode 64D74AAA74F30DC2CFB36343CE5D4451B9A4DBA8
+//	Published 2026-08-10 10:01:35
+//	LastStatus 2026-08-10 14:00:00
+//	ExitAddress 171.25.193.25 2026-08-10 14:39:36
+//
+// A relay may publish several ExitAddress lines, so every one is kept. Lines of
+// any other kind (including the ExitNode fingerprint) are skipped, as are blank
+// and unparseable ones.
+func parseTorExitAddresses(data []byte) []netip.Prefix {
+	var out []netip.Prefix
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		rest, ok := strings.CutPrefix(line, "ExitAddress ")
+		if !ok {
+			continue
+		}
+		field, _, _ := strings.Cut(strings.TrimSpace(rest), " ")
 		if p, ok := parsePrefixField(field); ok {
 			out = append(out, p)
 		}
