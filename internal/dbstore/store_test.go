@@ -6,6 +6,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -185,5 +188,52 @@ func TestPresignGetErrorPropagates(t *testing.T) {
 
 	if _, err := dbstore.PresignGet(context.Background(), store, "databases/x.mmdb.zst", time.Hour); err == nil {
 		t.Fatal("PresignGet() error = nil, want the presign error to propagate")
+	}
+}
+
+// TestSaveIndexSendsNoCache asserts that the index PUT carries
+// Cache-Control: no-cache on the wire.
+//
+// dbstoretest.Fake deliberately drops every ClientOption, so it cannot see this
+// one; the header is only observable from the other end of a real request. That
+// is the point of testing it at all. The option is threaded through
+// simplestorage into the S3 SDK's middleware, so nothing short of an actual
+// request proves the header survives the trip, and a no-cache that silently
+// goes nowhere is exactly the failure this guards against.
+func TestSaveIndexSendsNoCache(t *testing.T) {
+	var mu sync.Mutex
+	var got http.Header
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		got = r.Header.Clone()
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client, err := simplestorage.New(context.Background(),
+		simplestorage.WithBucket("test-bucket"),
+		simplestorage.WithEndpoint(srv.URL),
+		simplestorage.WithPathStyle(true),
+		simplestorage.WithAccessKeypair("test-key-id", "test-secret"),
+	)
+	if err != nil {
+		t.Fatalf("simplestorage.New() error = %v", err)
+	}
+
+	if err := dbstore.SaveIndex(context.Background(), client, &fetchv1.ListResponse{}); err != nil {
+		t.Fatalf("SaveIndex() error = %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if got == nil {
+		t.Fatal("SaveIndex() sent no request to the test endpoint")
+	}
+	if want := "no-cache"; got.Get("Cache-Control") != want {
+		t.Logf("want: %q", want)
+		t.Logf("got:  %q", got.Get("Cache-Control"))
+		t.Error("SaveIndex() did not set Cache-Control on the index PUT")
 	}
 }
