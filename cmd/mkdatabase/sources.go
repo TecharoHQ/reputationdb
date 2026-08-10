@@ -226,7 +226,13 @@ var httpSources = []httpSource{
 	},
 	{
 		name:     "github.com/juergen2025sys/NETSHIELD",
-		url:      "https://github.com/juergen2025sys/NETSHIELD/raw/refs/heads/main/blacklist_confidence40_ipv4.txt",
+		url:      "https://github.com/juergen2025sys/NETSHIELD/raw/refs/heads/main/blacklist_confidence40_ipv4_part1.txt",
+		provider: "netshield",
+		category: vpnip.CategoryAbuse,
+	},
+	{
+		name:     "github.com/juergen2025sys/NETSHIELD",
+		url:      "https://github.com/juergen2025sys/NETSHIELD/raw/refs/heads/main/blacklist_confidence40_ipv4_part2.txt",
 		provider: "netshield",
 		category: vpnip.CategoryAbuse,
 	},
