@@ -496,6 +496,39 @@ func TestParseRBLDNSD(t *testing.T) {
 	}
 }
 
+func TestParseTorExitAddresses(t *testing.T) {
+	in := strings.Join([]string{
+		"ExitNode 64D74AAA74F30DC2CFB36343CE5D4451B9A4DBA8",
+		"Published 2026-08-10 10:01:35",
+		"LastStatus 2026-08-10 14:00:00",
+		"ExitAddress 171.25.193.25 2026-08-10 14:39:36",
+		"ExitNode 0DC16FEAA5A5E27A974009CBF7748BB6FAAE6DE1",
+		"Published 2026-08-10 00:39:36",
+		"LastStatus 2026-08-10 14:00:00",
+		// One relay may exit from several addresses; keep them all.
+		"ExitAddress 80.67.167.81 2026-08-10 14:21:43",
+		"ExitAddress 2001:db8::1 2026-08-10 14:21:43",
+		"",
+		"ExitAddress not-an-ip 2026-08-10 14:21:43",
+		"ExitAddressNotThisField 203.0.113.4 2026-08-10 14:21:43",
+	}, "\n")
+	want := []string{
+		"171.25.193.25/32",
+		"80.67.167.81/32",
+		"2001:db8::1/128",
+	}
+
+	got := parseTorExitAddresses([]byte(in))
+	if len(got) != len(want) {
+		t.Fatalf("got %d prefixes %v, want %d %v", len(got), got, len(want), want)
+	}
+	for i, w := range want {
+		if p := netip.MustParsePrefix(w); got[i] != p {
+			t.Errorf("prefix %d: got %s, want %s", i, got[i], p)
+		}
+	}
+}
+
 func TestGunzip(t *testing.T) {
 	const body = "203.0.113.4/32 listed\n"
 

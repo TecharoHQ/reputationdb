@@ -18,3 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what "not listed" looks like.
 - Fixed the `QueryRequest.ip_addresses` validation rule, which was applied to
   the whole list rather than to each item and so rejected every request.
+- Added the Tor Project's own `check.torproject.org/exit-addresses` list as a
+  source for the tor category. It is the authoritative record of the addresses
+  Tor exit relays egress from, and a relay that publishes several exit addresses
+  contributes all of them.
