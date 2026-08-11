@@ -645,6 +645,13 @@ var fileSources = []fileSource{
 		provider: "techaro",
 		category: vpnip.CategoryAbuse,
 	},
+	{
+		// Addresses caught spamming Xe's sites on 2026-08-11.
+		name:     "20260811-weirdspam",
+		path:     "data/manually-submitted/xe/20260811-weirdspam.txt",
+		provider: "techaro",
+		category: vpnip.CategoryCrawler,
+	},
 
 	// Per-network blackhole lists submitted by nochan on 2026-07-14, one file per
 	// network. Every list names the network it blackholes, so each entry keeps
