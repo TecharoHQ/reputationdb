@@ -652,6 +652,14 @@ var fileSources = []fileSource{
 		provider: "techaro",
 		category: vpnip.CategoryCrawler,
 	},
+	{
+		// Addresses caught running the Lightpanda headless browser against
+		// heavyboar's sites on 2026-08-21.
+		name:     "2026-08-21-lightpanda",
+		path:     "data/manually-submitted/heavyboar/2026-08-21-lightpanda.txt",
+		provider: "heavyboar",
+		category: vpnip.CategoryCrawler,
+	},
 
 	// Per-network blackhole lists submitted by nochan on 2026-07-14, one file per
 	// network. Every list names the network it blackholes, so each entry keeps
