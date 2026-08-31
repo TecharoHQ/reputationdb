@@ -660,6 +660,14 @@ var fileSources = []fileSource{
 		provider: "heavyboar",
 		category: vpnip.CategoryCrawler,
 	},
+	{
+		// Addresses impersonating Common Crawl's CCBot while scraping, reported in
+		// https://github.com/TecharoHQ/anubis/issues/1865#issuecomment-5474874012.
+		name:     "20260831-fake-ccbot",
+		path:     "data/manually-submitted/fake-ccbot/20260831-fake-ccbot.txt",
+		provider: "fake-ccbot",
+		category: vpnip.CategoryAbuse,
+	},
 
 	// Per-network blackhole lists submitted by nochan on 2026-07-14, one file per
 	// network. Every list names the network it blackholes, so each entry keeps
