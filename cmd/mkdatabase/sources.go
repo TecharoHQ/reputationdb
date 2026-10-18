@@ -1018,7 +1018,6 @@ var asnSources = []asnSource{
 	{asn: 209588, provider: "flyservers", categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}},
 	{asn: 207137, provider: "packethub", categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}},
 	{asn: 51852, provider: "private-layer", categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}},
-	{asn: 8100, provider: "quadranet", categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}},
 	{asn: 25820, provider: "it7", categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}},
 	{asn: 53850, provider: "gorillaservers", categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}},
 	{asn: 207990, provider: "hostroyale", categories: []string{vpnip.CategoryDatacenter, vpnip.CategoryAbuse}},
